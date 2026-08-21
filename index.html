@@ -629,8 +629,22 @@ const iBtn = document.getElementById('installBtn');
 let deferred = null;
 
 if(!standalone) iBtn.hidden = false;
-addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; });
+
+// 크롬은 설치 신호를 로드 직후가 아니라 1~2초 뒤에 보냄 → 기다렸다가 처리
+let waiters = [];
+addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferred = e;
+  waiters.forEach(f => f(e)); waiters = [];
+});
 addEventListener('appinstalled', () => { iBtn.hidden = true; toast('설치했어요'); });
+
+function waitPrompt(ms){
+  if(deferred) return Promise.resolve(deferred);
+  return new Promise(res => {
+    const t = setTimeout(() => res(null), ms);
+    waiters.push(e => { clearTimeout(t); res(e); });
+  });
+}
 
 // 브라우저 종류 판별
 const UA = navigator.userAgent;
@@ -642,10 +656,23 @@ const inApp = /KAKAOTALK|NAVER|DaumApps|Instagram|FBAN|FBAV|FB_IAB|Line\/|everyt
 if(!standalone) iBtn.textContent = inApp ? (isIOS ? 'Safari로 열기' : '크롬으로 열기') : '설치';
 
 iBtn.onclick = async () => {
-  if(inApp){ escapeInApp(); return; }
-  if(deferred){
+  if(inApp){ escapeInApp(false); return; }
+
+  if(deferred){                       // 이미 준비됨 → 바로 설치창
     deferred.prompt();
     const { outcome } = await deferred.userChoice;
+    deferred = null;
+    if(outcome === 'accepted') iBtn.hidden = true;
+    return;
+  }
+
+  const label = iBtn.textContent;     // 아직이면 최대 4초 기다림
+  iBtn.textContent = '준비 중…';
+  const p = await waitPrompt(4000);
+  iBtn.textContent = label;
+  if(p){
+    p.prompt();
+    const { outcome } = await p.userChoice;
     deferred = null;
     if(outcome === 'accepted') iBtn.hidden = true;
     return;
@@ -654,16 +681,23 @@ iBtn.onclick = async () => {
 };
 
 // 카톡·네이버 등 앱 내장 브라우저에서 바깥 브라우저로 빠져나가기
-function escapeInApp(){
+function escapeInApp(auto){
   const url = location.href.split('#')[0];
   if(isKakao){
     location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
   }else if(isAndroid){
     location.href = 'intent://' + url.replace(/^https?:\/\//,'') +
       '#Intent;scheme=https;package=com.android.chrome;action=android.intent.action.VIEW;end';
+  }else if(!auto){
+    showHowto(); return;
   }
-  // 자동 전환이 막혔으면 수동 안내
-  setTimeout(() => { if(!document.hidden) showHowto(); }, 1600);
+  if(!auto) setTimeout(() => { if(!document.hidden) showHowto(); }, 1600);
+}
+
+// 링크를 눌러 들어온 순간 자동으로 바깥 브라우저로 (한 번만 시도)
+if(inApp && !sessionStorage.getItem('escaped')){
+  sessionStorage.setItem('escaped','1');
+  setTimeout(() => escapeInApp(true), 400);
 }
 
 function showHowto(){
