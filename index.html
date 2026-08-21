@@ -252,9 +252,11 @@ input[type=date]{color-scheme:light dark}
 <section class="sheet" id="howto">
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('howto')">← 닫기</button>
-    <strong style="font-size:14px;font-weight:800;letter-spacing:-.03em">홈 화면에 추가</strong>
+    <span style="font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--dimmer)">설치 안내</span>
   </div>
   <div id="howtoBody" class="dtl-body" style="margin-top:0"></div>
+  <button class="primary" id="copyLink">링크 복사하기</button>
+  <p class="hint">복사한 뒤 크롬 주소창에 붙여넣으면 설치할 수 있어요.</p>
 </section>
 
 <div class="lightbox" id="lightbox">
@@ -630,7 +632,17 @@ if(!standalone) iBtn.hidden = false;
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; });
 addEventListener('appinstalled', () => { iBtn.hidden = true; toast('설치했어요'); });
 
+// 브라우저 종류 판별
+const UA = navigator.userAgent;
+const isAndroid = /android/i.test(UA);
+const isKakao   = /KAKAOTALK/i.test(UA);
+const inApp = /KAKAOTALK|NAVER|DaumApps|Instagram|FBAN|FBAV|FB_IAB|Line\/|everytime|Snapchat|Threads|Whale/i.test(UA);
+
+// 상황에 맞게 버튼 문구 변경
+if(!standalone) iBtn.textContent = inApp ? (isIOS ? 'Safari로 열기' : '크롬으로 열기') : '설치';
+
 iBtn.onclick = async () => {
+  if(inApp){ escapeInApp(); return; }
   if(deferred){
     deferred.prompt();
     const { outcome } = await deferred.userChoice;
@@ -638,10 +650,47 @@ iBtn.onclick = async () => {
     if(outcome === 'accepted') iBtn.hidden = true;
     return;
   }
-  document.getElementById('howtoBody').innerHTML = isIOS
-    ? '사파리에서 아래쪽 <b>공유 버튼</b>을 누르고\n<b>홈 화면에 추가</b>를 선택하세요.\n\n크롬 앱에서 열었다면 사파리로 다시 열어야 설치할 수 있어요.'
-    : '브라우저 메뉴(⋮)에서\n<b>앱 설치</b> 또는 <b>홈 화면에 추가</b>를 누르세요.\n\n이미 설치했다면 홈 화면의 아이콘으로 열면 됩니다.';
+  showHowto();
+};
+
+// 카톡·네이버 등 앱 내장 브라우저에서 바깥 브라우저로 빠져나가기
+function escapeInApp(){
+  const url = location.href.split('#')[0];
+  if(isKakao){
+    location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
+  }else if(isAndroid){
+    location.href = 'intent://' + url.replace(/^https?:\/\//,'') +
+      '#Intent;scheme=https;package=com.android.chrome;action=android.intent.action.VIEW;end';
+  }
+  // 자동 전환이 막혔으면 수동 안내
+  setTimeout(() => { if(!document.hidden) showHowto(); }, 1600);
+}
+
+function showHowto(){
+  const steps = inApp
+    ? (isIOS
+        ? '① 오른쪽 아래 <b>메뉴</b> → <b>Safari로 열기</b>\n② 사파리 아래쪽 <b>공유 버튼</b>\n③ <b>홈 화면에 추가</b>'
+        : '① 오른쪽 아래 <b>메뉴</b>\n② <b>다른 브라우저로 열기</b> → <b>Chrome</b>\n③ 크롬에서 오른쪽 위 <b>설치</b> 버튼')
+    : (isIOS
+        ? '① 화면 아래쪽 <b>공유 버튼</b>\n② <b>홈 화면에 추가</b>\n③ 오른쪽 위 <b>추가</b>'
+        : '① 브라우저 메뉴 <b>⋮</b>\n② <b>앱 설치</b> 또는 <b>홈 화면에 추가</b>');
+  document.getElementById('howtoBody').innerHTML =
+    (inApp ? '지금 <b>카톡·네이버 같은 앱 안의 브라우저</b>로 열려 있어서\n설치가 안 돼요.\n\n' : '') + steps;
   openSheet('howto');
+}
+
+document.getElementById('copyLink').onclick = async () => {
+  const url = location.href.split('?')[0];
+  try{
+    await navigator.clipboard.writeText(url);
+    toast('링크를 복사했어요');
+  }catch{
+    const t = document.createElement('textarea');
+    t.value = url; document.body.appendChild(t); t.select();
+    try{ document.execCommand('copy'); toast('링크를 복사했어요'); }
+    catch{ toast(url); }
+    t.remove();
+  }
 };
 
 if('serviceWorker' in navigator) addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
