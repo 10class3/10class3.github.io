@@ -1,5 +1,5 @@
 // 앱 내용을 수정하고 반영이 안 되면 아래 숫자를 v2, v3... 으로 올리세요
-const CACHE = 'banner-v3';
+const CACHE = 'banner-v4';
 const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

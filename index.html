@@ -6,7 +6,7 @@
 <title>3반 알리미</title>
 
 <link rel="manifest" href="./manifest.json">
-<meta name="theme-color" content="#14161a">
+<meta name="theme-color" id="themeMeta" content="#ffffff">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -20,41 +20,57 @@
 :root{
   --ink:#14161a;
   --paper:#ffffff;
+  --panel:#ffffff;
   --rule:#e6e8ec;
   --dim:#8d939c;
   --dimmer:#b8bcc4;
-  --c0:#ffe95c;
-  --c1:#c9b8ff;
-  --c2:#a3efc9;
   --urgent:#e5352b;
+  --markpos:58%;          /* 밝은 화면: 형광펜 */
+  --lb:#000;
+}
+html[data-theme="dark"]{
+  --ink:#eef1f6;
+  --paper:#101216;
+  --panel:#171a20;
+  --rule:#2a2f38;
+  --dim:#878e9b;
+  --dimmer:#5c636f;
+  --urgent:#ff6b62;
+  --markpos:88%;          /* 어두운 화면: 얇은 밑줄 */
+  --lb:#000;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-html,body{margin:0;padding:0}
+html,body{margin:0;padding:0;background:var(--paper)}
 body{
-  background:var(--paper);color:var(--ink);
+  color:var(--ink);
   font-family:'Pretendard Variable',Pretendard,-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
   font-feature-settings:'tnum';
   padding-bottom:calc(env(safe-area-inset-bottom) + 96px);
+  transition:background .18s,color .18s;
 }
-button,input,textarea,select{font-family:inherit;color:inherit}
+button,input,textarea{font-family:inherit;color:inherit}
 
 header{
   position:sticky;top:0;z-index:20;background:var(--paper);
   padding:calc(env(safe-area-inset-top) + 18px) 20px 0;border-bottom:1px solid var(--rule);
 }
-.hrow{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.hrow{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .brand{cursor:pointer;user-select:none;flex:1;min-width:0}
 .brand h1{font-size:26px;font-weight:900;letter-spacing:-.045em;margin:0}
 .brand .today{font-size:12.5px;font-weight:600;color:var(--dim);letter-spacing:-.02em;display:block;margin-top:3px}
-.hact{display:flex;gap:7px;flex-shrink:0;padding-top:3px}
+.hact{display:flex;gap:6px;flex-shrink:0;padding-top:3px;align-items:center}
 .hbtn{
-  border:1.5px solid var(--ink);background:var(--ink);color:#fff;border-radius:999px;
-  padding:8px 14px;font-size:12.5px;font-weight:800;letter-spacing:-.03em;cursor:pointer;white-space:nowrap;
+  border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:999px;
+  padding:8px 13px;font-size:12.5px;font-weight:800;letter-spacing:-.03em;cursor:pointer;white-space:nowrap;
 }
-.hbtn.ghost{background:var(--paper);color:var(--ink)}
-.hbtn[hidden]{display:none}
+.hbtn.ghost{background:transparent;color:var(--ink)}
+.iconbtn{
+  width:34px;height:34px;border-radius:999px;border:1.5px solid var(--rule);background:transparent;
+  font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;
+}
+[hidden]{display:none!important}
 
-.tabs{display:flex;gap:20px;margin-top:15px;overflow-x:auto;scrollbar-width:none}
+.tabs{display:flex;gap:19px;margin-top:15px;overflow-x:auto;scrollbar-width:none}
 .tabs::-webkit-scrollbar{display:none}
 .tab{
   background:none;border:0;padding:0 0 11px;margin:0;
@@ -74,7 +90,7 @@ main{padding:0 20px}
 .dnum.urgent{color:var(--urgent)}
 .dnum.none{font-size:15px;font-weight:800;color:var(--dimmer);letter-spacing:-.03em}
 .rtitle{font-size:16.5px;font-weight:800;letter-spacing:-.035em;line-height:1.35;margin:0 0 6px;word-break:keep-all}
-.rtitle mark{background:linear-gradient(transparent 58%,var(--mk) 58%);color:inherit;padding:0 1px}
+.rtitle mark{background:linear-gradient(transparent var(--markpos),var(--mk) var(--markpos));color:inherit;padding:0 1px}
 .rmeta{font-size:12.5px;font-weight:600;color:var(--dim);letter-spacing:-.02em;display:flex;gap:7px;flex-wrap:wrap}
 .rmeta .cat{color:var(--ink);font-weight:800}
 .rprev{font-size:13.5px;color:var(--dim);line-height:1.5;margin:7px 0 0;letter-spacing:-.02em;
@@ -95,7 +111,7 @@ main{padding:0 20px}
 @keyframes up{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
 .sheettop{display:flex;justify-content:space-between;align-items:center;margin-bottom:26px}
 .xbtn{background:none;border:0;font-size:15px;font-weight:700;color:var(--dim);padding:6px 0;cursor:pointer;letter-spacing:-.02em}
-.dtl-cat{font-size:11.5px;font-weight:800;letter-spacing:.05em;margin-bottom:11px}
+.dtl-cat{font-size:11.5px;font-weight:800;letter-spacing:.05em;margin-bottom:11px;padding:0 2px}
 .dtl-title{font-size:25px;font-weight:900;letter-spacing:-.05em;line-height:1.28;margin:0 0 13px;word-break:keep-all}
 .dtl-date{font-size:14px;font-weight:700;color:var(--dim);letter-spacing:-.02em;padding-bottom:20px;border-bottom:2px solid var(--ink)}
 .dtl-body{font-size:15.5px;line-height:1.72;white-space:pre-wrap;margin:22px 0 0;letter-spacing:-.02em;word-break:keep-all}
@@ -109,50 +125,53 @@ main{padding:0 20px}
 label.f{display:block;font-size:12px;font-weight:800;margin:19px 0 7px;color:var(--dim)}
 input[type=text],input[type=date],input[type=password],textarea{
   width:100%;padding:13px 14px;border:1.5px solid var(--rule);border-radius:10px;
-  font-size:15.5px;font-weight:600;letter-spacing:-.02em;background:var(--paper);outline:none}
+  font-size:15.5px;font-weight:600;letter-spacing:-.02em;background:var(--panel);outline:none}
 input:focus,textarea:focus{border-color:var(--ink)}
 textarea{min-height:140px;resize:vertical;line-height:1.6;font-weight:500}
-.catpick{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}
-.catpick button{padding:13px 4px;border:1.5px solid var(--rule);background:var(--paper);border-radius:10px;
-  font-size:13px;font-weight:800;letter-spacing:-.03em;cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.catpick button[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:#fff}
-.primary{width:100%;padding:16px;border:0;border-radius:12px;background:var(--ink);color:#fff;
+input[type=date]{color-scheme:light dark}
+.catpick{display:flex;flex-wrap:wrap;gap:7px}
+.catpick button{flex:1 1 30%;min-width:88px;padding:13px 6px;border:1.5px solid var(--rule);
+  background:transparent;border-radius:10px;font-size:13px;font-weight:800;letter-spacing:-.03em;
+  cursor:pointer;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.catpick button[aria-pressed="true"]{border-color:var(--ink);background:var(--ink);color:var(--paper)}
+.primary{width:100%;padding:16px;border:0;border-radius:12px;background:var(--ink);color:var(--paper);
   font-size:16px;font-weight:800;letter-spacing:-.03em;cursor:pointer;margin-top:28px}
-.primary:disabled{background:var(--rule);color:var(--dimmer)}
+.primary:disabled{opacity:.45}
 .picked{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
 .picked .p{position:relative}
 .picked img{width:70px;height:70px;object-fit:cover;border-radius:7px;border:1px solid var(--rule);display:block}
 .picked .rm{position:absolute;top:-6px;right:-6px;width:22px;height:22px;border-radius:50%;
-  background:var(--ink);color:#fff;border:0;font-size:13px;line-height:1;cursor:pointer}
+  background:var(--ink);color:var(--paper);border:0;font-size:13px;line-height:1;cursor:pointer}
 .hint{font-size:11.5px;color:var(--dimmer);font-weight:600;margin-top:7px;line-height:1.5}
-.filebtn{width:100%;padding:15px;border:1.5px dashed var(--rule);border-radius:10px;background:var(--paper);
+.filebtn{width:100%;padding:15px;border:1.5px dashed var(--rule);border-radius:10px;background:transparent;
   font-size:14px;font-weight:700;color:var(--dim);cursor:pointer;letter-spacing:-.02em}
-.swatch{display:inline-block;width:11px;height:11px;border-radius:3px;margin-right:7px;vertical-align:-1px}
+
+/* 분류 편집 */
+.crow{display:flex;align-items:center;gap:9px;padding:11px 0;border-bottom:1px solid var(--rule)}
+.crow .sw{width:15px;height:15px;border-radius:4px;flex-shrink:0}
+.crow input{flex:1;padding:11px 12px;font-size:15px}
+.crow .del{background:none;border:0;color:var(--dim);font-size:19px;cursor:pointer;padding:4px 2px;flex-shrink:0}
 
 .fab{position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom) + 22px);z-index:30;
-  width:56px;height:56px;border-radius:50%;border:0;background:var(--ink);color:#fff;
-  font-size:27px;font-weight:300;line-height:1;cursor:pointer;display:none;box-shadow:0 6px 20px rgba(0,0,0,.22)}
+  width:56px;height:56px;border-radius:50%;border:0;background:var(--ink);color:var(--paper);
+  font-size:27px;font-weight:300;line-height:1;cursor:pointer;display:none;box-shadow:0 6px 20px rgba(0,0,0,.28)}
 .fab.on{display:block}
 .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 92px);
-  background:var(--ink);color:#fff;padding:12px 19px;border-radius:999px;font-size:13.5px;font-weight:700;
-  z-index:95;opacity:0;transition:opacity .2s;pointer-events:none;letter-spacing:-.02em;max-width:88vw;text-align:center}
+  background:var(--ink);color:var(--paper);padding:12px 19px;border-radius:999px;font-size:13.5px;font-weight:700;
+  z-index:130;opacity:0;transition:opacity .2s;pointer-events:none;letter-spacing:-.02em;max-width:88vw;text-align:center}
 .toast.on{opacity:1}
 
-/* 사진 뷰어 */
-.lightbox{position:fixed;inset:0;z-index:120;background:#000;display:none;
+.lightbox{position:fixed;inset:0;z-index:120;background:var(--lb);display:none;
   align-items:center;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 .lightbox.on{display:flex}
 .lightbox img{max-width:100%;max-height:100%;object-fit:contain;display:block}
 .lbclose{position:absolute;top:calc(env(safe-area-inset-top) + 12px);right:16px;
   background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:999px;
   width:38px;height:38px;font-size:17px;cursor:pointer;backdrop-filter:blur(6px)}
-.lbtip{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 20px);left:0;right:0;text-align:center;
-  color:rgba(255,255,255,.6);font-size:12px;font-weight:600;letter-spacing:-.02em}
 .lbsave{position:absolute;bottom:calc(env(safe-area-inset-bottom) + 22px);left:50%;transform:translateX(-50%);
   background:rgba(255,255,255,.92);color:#14161a;border:0;border-radius:999px;
   padding:12px 24px;font-size:14px;font-weight:800;letter-spacing:-.03em;cursor:pointer;
   backdrop-filter:blur(6px);box-shadow:0 4px 16px rgba(0,0,0,.35)}
-.lbsave:active{transform:translateX(-50%) scale(.96)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -165,7 +184,8 @@ textarea{min-height:140px;resize:vertical;line-height:1.6;font-weight:500}
       <span class="today" id="today"></span>
     </div>
     <div class="hact">
-      <button class="hbtn ghost" id="gearBtn" hidden>분류 설정</button>
+      <button class="iconbtn" id="themeBtn" aria-label="화면 모드 전환">☾</button>
+      <button class="hbtn ghost" id="gearBtn" hidden>분류</button>
       <button class="hbtn" id="installBtn" hidden>설치</button>
     </div>
   </div>
@@ -176,7 +196,6 @@ textarea{min-height:140px;resize:vertical;line-height:1.6;font-weight:500}
 
 <button class="fab" id="fab" aria-label="새 안내 작성">+</button>
 
-<!-- 상세 -->
 <section class="sheet" id="detail">
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('detail')">← 목록</button>
@@ -185,7 +204,6 @@ textarea{min-height:140px;resize:vertical;line-height:1.6;font-weight:500}
   <div id="detailBody"></div>
 </section>
 
-<!-- 작성 -->
 <section class="sheet" id="write">
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('write')">← 취소</button>
@@ -208,18 +226,17 @@ textarea{min-height:140px;resize:vertical;line-height:1.6;font-weight:500}
   <button class="primary" id="saveBtn">올리기</button>
 </section>
 
-<!-- 분류 이름 설정 -->
 <section class="sheet" id="settings">
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('settings')">← 닫기</button>
-    <strong style="font-size:14px;font-weight:800;letter-spacing:-.03em">분류 이름</strong>
+    <strong style="font-size:14px;font-weight:800;letter-spacing:-.03em">분류 관리</strong>
   </div>
-  <p class="hint" style="margin:0 0 4px">이름만 바뀌고 기존 안내는 그대로 유지돼요. 모든 사용자 화면에 바로 반영됩니다.</p>
+  <p class="hint" style="margin:0 0 10px">이름을 고치거나 분류를 추가할 수 있어요. 색은 순서대로 자동 배정됩니다. 저장하면 모든 사용자 화면에 바로 반영돼요.</p>
   <div id="catEdit"></div>
+  <button class="filebtn" id="catAdd" style="margin-top:14px">＋ 분류 추가</button>
   <button class="primary" id="catSave">저장</button>
 </section>
 
-<!-- 관리자 로그인 -->
 <section class="sheet" id="admin">
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('admin')">← 닫기</button>
@@ -232,7 +249,6 @@ textarea{min-height:140px;resize:vertical;line-height:1.6;font-weight:500}
   <button class="primary" id="loginBtn">로그인</button>
 </section>
 
-<!-- 설치 안내(iOS) -->
 <section class="sheet" id="howto">
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('howto')">← 닫기</button>
@@ -241,7 +257,6 @@ textarea{min-height:140px;resize:vertical;line-height:1.6;font-weight:500}
   <div id="howtoBody" class="dtl-body" style="margin-top:0"></div>
 </section>
 
-<!-- 사진 뷰어 -->
 <div class="lightbox" id="lightbox">
   <img id="lbImg" alt="안내 사진">
   <button class="lbclose" id="lbClose" aria-label="닫기">✕</button>
@@ -273,24 +288,44 @@ const auth = getAuth(app);
 const COL  = collection(db, 'notices');
 const CFG  = doc(db, 'config', 'categories');
 
-/* ── 분류: id는 절대 안 바뀌고 name만 바뀜 ── */
+/* ═══ 화면 모드 ═══ */
+const themeMeta = document.getElementById('themeMeta');
+const themeBtn  = document.getElementById('themeBtn');
+let theme = localStorage.getItem('theme') ||
+  (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+
+function applyTheme(t){
+  theme = t;
+  document.documentElement.dataset.theme = t;
+  themeBtn.textContent = t === 'dark' ? '☀' : '☾';
+  themeMeta.setAttribute('content', t === 'dark' ? '#101216' : '#ffffff');
+  localStorage.setItem('theme', t);
+}
+applyTheme(theme);
+themeBtn.onclick = () => applyTheme(theme === 'dark' ? 'light' : 'dark');
+
+/* ═══ 분류 (id 고정, 이름·개수는 변경 가능) ═══ */
 const DEFAULT_CATS = [
   { id:'수행평가', name:'수행평가' },
   { id:'행사',     name:'행사' },
   { id:'생기부',   name:'생기부' }
 ];
-const COLORS = ['var(--c0)','var(--c1)','var(--c2)'];
+const PALETTE = ['#ffe95c','#c9b8ff','#a3efc9','#ffbf9b','#9fd7ff','#ffb3d1','#d7e37a','#ffd6a5'];
+const GRAY = '#c4c9d1';
+const MAX_CATS = 8;
+
 let cats = DEFAULT_CATS.map(c => ({...c}));
-const catIdx   = id => Math.max(0, cats.findIndex(c => c.id === id));
-const catName  = id => (cats.find(c => c.id === id) || {}).name || id;
-const catColor = id => COLORS[catIdx(id)] || COLORS[0];
+let draft = [];
+const catFound  = id => cats.findIndex(c => c.id === id);
+const catName   = id => { const i = catFound(id); return i < 0 ? '기타' : cats[i].name; };
+const catColor  = id => { const i = catFound(id); return i < 0 ? GRAY : PALETTE[i % PALETTE.length]; };
 
 let items = [], cat = 'all', isAdmin = false, current = null, pics = [], wCat = cats[0].id;
 
-/* ── 날짜 ── */
+/* ═══ 날짜 ═══ */
 const midnight = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
 const TODAY = midnight(new Date());
-const dday = s => s ? Math.round((midnight(new Date(s + 'T00:00:00')) - TODAY) / 86400000) : null;
+const dday = s => s ? Math.round((midnight(new Date(s+'T00:00:00')) - TODAY)/86400000) : null;
 function ddayText(n){
   if(n === null) return { num:'상시', label:'', cls:'none' };
   if(n === 0) return { num:'오늘', label:'', cls:'urgent' };
@@ -298,34 +333,35 @@ function ddayText(n){
   if(n > 0)   return { num:'D-'+n, label:'', cls:n<=3?'urgent':'' };
   return { num:'D+'+Math.abs(n), label:'지남', cls:'' };
 }
-function korDate(s){
+const korDate = s => {
   if(!s) return '날짜 없음';
-  const d = new Date(s + 'T00:00:00');
+  const d = new Date(s+'T00:00:00');
   return `${d.getMonth()+1}월 ${d.getDate()}일 (${['일','월','화','수','목','금','토'][d.getDay()]})`;
-}
-const esc = (s='') => s.replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
+};
+const esc = (s='') => String(s).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 
-/* ── 탭 ── */
+/* ═══ 탭 ═══ */
 function renderTabs(){
+  if(cat !== 'all' && catFound(cat) < 0) cat = 'all';
   const box = document.getElementById('tabs');
   box.innerHTML =
     `<button class="tab" role="tab" data-cat="all" aria-selected="${cat==='all'}">전체<span class="n" data-n="all"></span></button>` +
     cats.map(c => `<button class="tab" role="tab" data-cat="${esc(c.id)}" aria-selected="${cat===c.id}">${esc(c.name)}<span class="n" data-n="${esc(c.id)}"></span></button>`).join('');
   box.querySelectorAll('.tab').forEach(t => t.onclick = () => {
     cat = t.dataset.cat;
-    box.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x === t ? 'true' : 'false'));
+    box.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x===t ? 'true':'false'));
     render();
   });
 }
 
-/* ── 목록 ── */
+/* ═══ 목록 ═══ */
 function render(){
   const box = document.getElementById('list');
   const pool = items.filter(i => cat === 'all' || i.cat === cat);
 
   document.querySelectorAll('[data-n]').forEach(el => {
     const c = el.dataset.n;
-    el.textContent = items.filter(i => (c === 'all' || i.cat === c) && (!i.date || dday(i.date) >= 0)).length || '';
+    el.textContent = items.filter(i => (c==='all'||i.cat===c) && (!i.date || dday(i.date) >= 0)).length || '';
   });
 
   const live = pool.filter(i => !i.date || dday(i.date) >= 0).sort((a,b)=>(a.date||'9999').localeCompare(b.date||'9999'));
@@ -340,9 +376,9 @@ function render(){
   box.querySelectorAll('.row').forEach(r => r.onclick = () => openDetail(r.dataset.id));
 }
 
-function rowHTML(i, isPast){
+function rowHTML(i,isPast){
   const d = ddayText(dday(i.date));
-  const thumbs = (i.images||[]).slice(0,3).map(s => `<img src="${s}" alt="">`).join('');
+  const thumbs = (i.images||[]).slice(0,3).map(s=>`<img src="${s}" alt="">`).join('');
   return `<article class="row ${isPast?'past':''}" data-id="${i.id}">
     <div class="dcell"><span class="dnum ${d.cls}">${d.num}</span>${d.label?`<span class="dlabel">${d.label}</span>`:''}</div>
     <div>
@@ -354,21 +390,19 @@ function rowHTML(i, isPast){
   </article>`;
 }
 
-/* ── 상세 ── */
+/* ═══ 상세 ═══ */
 window.openDetail = id => {
   const i = items.find(x => x.id === id); if(!i) return;
   current = i;
-  const imgs = (i.images||[]).map((s,n) =>
-    `<img src="${s}" alt="안내 사진 ${n+1}" data-full="${n}">`).join('');
+  const imgs = (i.images||[]).map((s,n)=>`<img src="${s}" alt="안내 사진 ${n+1}">`).join('');
   document.getElementById('detailBody').innerHTML = `
-    <div class="dtl-cat" style="background:linear-gradient(transparent 55%, ${catColor(i.cat)} 55%);display:inline-block">${esc(catName(i.cat))}</div>
+    <div class="dtl-cat"><mark style="--mk:${catColor(i.cat)};background:linear-gradient(transparent var(--markpos), ${catColor(i.cat)} var(--markpos));color:inherit">${esc(catName(i.cat))}</mark></div>
     <h2 class="dtl-title">${esc(i.title)}</h2>
     <div class="dtl-date">${korDate(i.date)}${i.date?' · '+ddayText(dday(i.date)).num:''}</div>
     ${i.body?`<p class="dtl-body">${esc(i.body)}</p>`:''}
     ${imgs?`<div class="dtl-imgs">${imgs}<p class="imgcap">사진을 누르면 크게 볼 수 있어요</p></div>`:''}
     <div class="dtl-foot"><span>3반 알리미</span><span>${i.createdAt?new Date(i.createdAt).toLocaleDateString('ko-KR')+' 등록':''}</span></div>`;
-  document.querySelectorAll('#detailBody .dtl-imgs img').forEach(img =>
-    img.onclick = () => openLightbox(img.src));
+  document.querySelectorAll('#detailBody .dtl-imgs img').forEach(img => img.onclick = () => openLightbox(img.src));
   document.getElementById('delBtn').style.display = isAdmin ? 'block' : 'none';
   openSheet('detail');
 };
@@ -379,40 +413,34 @@ window.removeItem = async () => {
   catch{ toast('삭제에 실패했어요'); }
 };
 
-/* ── 사진 뷰어 (data: 주소는 새 탭으로 못 열려서 앱 안에서 표시) ── */
+/* ═══ 사진 뷰어 ═══ */
 const lb = document.getElementById('lightbox');
 function openLightbox(src){
   document.getElementById('lbImg').src = src;
-  lb.classList.add('on');
-  document.body.style.overflow = 'hidden';
+  lb.classList.add('on'); document.body.style.overflow = 'hidden';
 }
 function closeLightbox(){
-  lb.classList.remove('on');
-  document.getElementById('lbImg').src = '';
+  lb.classList.remove('on'); document.getElementById('lbImg').src = '';
   if(!document.querySelector('.sheet.on')) document.body.style.overflow = '';
 }
 lb.onclick = closeLightbox;
 document.getElementById('lbClose').onclick = e => { e.stopPropagation(); closeLightbox(); };
 document.getElementById('lbImg').onclick = e => e.stopPropagation();
 
-// 사진 저장: data 주소를 blob으로 바꿔서 내려받기
 document.getElementById('lbSave').onclick = async e => {
   e.stopPropagation();
   const src = document.getElementById('lbImg').src;
   if(!src) return;
-  const name = `3반알리미_${(current?.title || '사진').replace(/[\\/:*?"<>|\s]+/g,'_').slice(0,20)}.jpg`;
+  const name = `3반알리미_${String(current?.title||'사진').replace(/[\\/:*?"<>|\s]+/g,'_').slice(0,20)}.jpg`;
   try{
     const blob = await (await fetch(src)).blob();
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 3000);
-    if(isIOS) toast('안 되면 사진을 길게 눌러 저장하세요');
-    else toast('사진을 저장했어요');
-  }catch{
-    toast('사진을 길게 눌러 저장해 주세요');
-  }
+    setTimeout(()=>URL.revokeObjectURL(url), 3000);
+    toast(isIOS ? '안 되면 사진을 길게 눌러 저장하세요' : '사진을 저장했어요');
+  }catch{ toast('사진을 길게 눌러 저장해 주세요'); }
 };
 
 window.openSheet  = id => { document.getElementById(id).classList.add('on'); document.body.style.overflow='hidden'; };
@@ -421,20 +449,22 @@ window.closeSheet = id => { document.getElementById(id).classList.remove('on'); 
 function toast(msg){
   const t = document.getElementById('toast');
   t.textContent = msg; t.classList.add('on');
-  setTimeout(() => t.classList.remove('on'), 2200);
+  setTimeout(()=>t.classList.remove('on'), 2400);
 }
 
-/* ── 데이터 구독 ── */
+/* ═══ 구독 ═══ */
 onSnapshot(CFG, snap => {
   const list = snap.exists() ? snap.data().list : null;
-  if(Array.isArray(list) && list.length) cats = list.map(c => ({ id:c.id, name:c.name || c.id }));
-  renderTabs(); render(); drawCatPick(); drawCatEdit();
+  if(Array.isArray(list) && list.length)
+    cats = list.filter(c => c && c.id).map(c => ({ id:String(c.id), name:c.name || String(c.id) }));
+  if(catFound(wCat) < 0) wCat = cats[0].id;
+  renderTabs(); render(); drawCatPick();
 }, () => {});
 
 onSnapshot(query(COL, orderBy('createdAt','desc')), snap => {
   items = snap.docs.map(d => {
     const v = d.data();
-    return { id:d.id, cat:v.cat||cats[0].id, title:v.title||'', date:v.date||'',
+    return { id:d.id, cat:v.cat||'', title:v.title||'', date:v.date||'',
              body:v.body||'', images:v.images||[], createdAt:v.createdAt?.toMillis?.()||null };
   });
   render();
@@ -443,11 +473,11 @@ onSnapshot(query(COL, orderBy('createdAt','desc')), snap => {
     '<div class="empty"><b>연결에 실패했어요</b>Firebase 설정을 확인해 주세요</div>';
 });
 
-/* ── 관리자 ── */
+/* ═══ 관리자 ═══ */
 let taps = 0, tapTimer;
 document.getElementById('brand').onclick = () => {
   taps++; clearTimeout(tapTimer);
-  tapTimer = setTimeout(() => taps = 0, 1200);
+  tapTimer = setTimeout(()=>taps=0, 1200);
   if(taps >= 5){
     taps = 0;
     if(isAdmin){ if(confirm('로그아웃할까요?')) signOut(auth); }
@@ -472,37 +502,63 @@ document.getElementById('loginBtn').onclick = async () => {
   }catch{ toast('이메일이나 비밀번호를 확인해 주세요'); }
 };
 
-/* ── 분류 이름 편집 ── */
-document.getElementById('gearBtn').onclick = () => { drawCatEdit(); openSheet('settings'); };
+/* ═══ 분류 관리 ═══ */
+document.getElementById('gearBtn').onclick = () => {
+  draft = cats.map(c => ({...c}));
+  drawCatEdit(); openSheet('settings');
+};
 
 function drawCatEdit(){
-  document.getElementById('catEdit').innerHTML = cats.map((c,n) => `
-    <label class="f"><span class="swatch" style="background:${COLORS[n]}"></span>${n+1}번째 분류</label>
-    <input type="text" data-cid="${esc(c.id)}" value="${esc(c.name)}" maxlength="10" placeholder="${esc(c.id)}">`).join('');
+  document.getElementById('catEdit').innerHTML = draft.map((c,n) => `
+    <div class="crow">
+      <span class="sw" style="background:${PALETTE[n % PALETTE.length]}"></span>
+      <input type="text" data-i="${n}" value="${esc(c.name)}" maxlength="10" placeholder="분류 이름">
+      <button class="del" data-del="${n}" aria-label="삭제">✕</button>
+    </div>`).join('');
+
+  document.querySelectorAll('#catEdit input').forEach(inp =>
+    inp.oninput = () => { draft[inp.dataset.i].name = inp.value; });
+
+  document.querySelectorAll('#catEdit .del').forEach(b => b.onclick = () => {
+    const n = +b.dataset.del;
+    if(draft.length <= 1){ toast('분류는 최소 하나 필요해요'); return; }
+    const used = items.filter(i => i.cat === draft[n].id).length;
+    const msg = used
+      ? `"${draft[n].name}" 분류에 안내 ${used}개가 있어요.\n삭제해도 안내는 남지만 "기타"로 표시됩니다. 계속할까요?`
+      : `"${draft[n].name}" 분류를 삭제할까요?`;
+    if(!confirm(msg)) return;
+    draft.splice(n,1); drawCatEdit();
+  });
 }
 
+document.getElementById('catAdd').onclick = () => {
+  if(draft.length >= MAX_CATS){ toast(`분류는 최대 ${MAX_CATS}개까지예요`); return; }
+  draft.push({ id:'c'+Date.now().toString(36), name:'' });
+  drawCatEdit();
+  const inputs = document.querySelectorAll('#catEdit input');
+  inputs[inputs.length-1].focus();
+};
+
 document.getElementById('catSave').onclick = async () => {
-  const next = [...document.querySelectorAll('#catEdit input')].map(inp => ({
-    id: inp.dataset.cid,
-    name: inp.value.trim() || inp.dataset.cid
-  }));
+  const next = draft.map(c => ({ id:c.id, name:(c.name||'').trim() }));
+  if(next.some(c => !c.name)){ toast('빈 이름이 있어요'); return; }
   const btn = document.getElementById('catSave');
   btn.disabled = true; btn.textContent = '저장 중…';
   try{
     await setDoc(CFG, { list: next });
-    closeSheet('settings'); toast('분류 이름을 바꿨어요');
-  }catch{ toast('저장 실패 — 보안 규칙에 config 항목을 추가했는지 확인하세요'); }
+    closeSheet('settings'); toast('분류를 저장했어요');
+  }catch{ toast('저장 실패 — 보안 규칙에 config 항목이 있는지 확인하세요'); }
   btn.disabled = false; btn.textContent = '저장';
 };
 
-/* ── 작성 ── */
+/* ═══ 작성 ═══ */
 function drawCatPick(){
   document.getElementById('catpick').innerHTML = cats.map(c =>
     `<button data-c="${esc(c.id)}" aria-pressed="${wCat===c.id}">${esc(c.name)}</button>`).join('');
   document.querySelectorAll('#catpick button').forEach(b => b.onclick = () => {
     wCat = b.dataset.c;
     document.querySelectorAll('#catpick button').forEach(x =>
-      x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+      x.setAttribute('aria-pressed', x===b ? 'true':'false'));
   });
 }
 
@@ -521,16 +577,16 @@ document.getElementById('wFile').onchange = async e => {
 };
 
 function drawPicked(){
-  document.getElementById('picked').innerHTML = pics.map((s,n) =>
+  document.getElementById('picked').innerHTML = pics.map((s,n)=>
     `<div class="p"><img src="${s}" alt=""><button class="rm" onclick="dropPic(${n})">✕</button></div>`).join('');
 }
 window.dropPic = n => { pics.splice(n,1); drawPicked(); };
 
 function compress(file){
-  return new Promise((res,rej) => {
+  return new Promise((res,rej)=>{
     const img = new Image();
     img.onload = () => {
-      const scale = Math.min(1, 1400 / Math.max(img.width, img.height));
+      const scale = Math.min(1, 1400/Math.max(img.width,img.height));
       const c = document.createElement('canvas');
       c.width = Math.round(img.width*scale); c.height = Math.round(img.height*scale);
       c.getContext('2d').drawImage(img,0,0,c.width,c.height);
@@ -560,7 +616,7 @@ document.getElementById('saveBtn').onclick = async () => {
   btn.disabled = false; btn.textContent = '올리기';
 };
 
-/* ── 설치 버튼 (오른쪽 위) ── */
+/* ═══ 설치 ═══ */
 document.getElementById('today').textContent =
   `${TODAY.getMonth()+1}월 ${TODAY.getDate()}일 ${['일','월','화','수','목','금','토'][TODAY.getDay()]}요일`;
 
@@ -570,9 +626,7 @@ const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) ||
 const iBtn = document.getElementById('installBtn');
 let deferred = null;
 
-// 앱으로 실행 중이 아니면 항상 표시
 if(!standalone) iBtn.hidden = false;
-
 addEventListener('beforeinstallprompt', e => { e.preventDefault(); deferred = e; });
 addEventListener('appinstalled', () => { iBtn.hidden = true; toast('설치했어요'); });
 
@@ -598,7 +652,7 @@ addEventListener('keydown', e => {
   else document.querySelectorAll('.sheet.on').forEach(s => closeSheet(s.id));
 });
 
-renderTabs(); drawCatPick(); drawCatEdit();
+renderTabs(); drawCatPick();
 </script>
 </body>
 </html>
