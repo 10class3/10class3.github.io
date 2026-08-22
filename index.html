@@ -5,6 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>3반 알리미</title>
 
+<!-- 화면이 그려지기 전에 테마를 먼저 정해서 흰 번쩍임 방지 -->
+<script>
+(function(){
+  var t;
+  try{ t = localStorage.getItem('theme'); }catch(e){}
+  if(!t) t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  var d = document.documentElement;
+  d.dataset.theme = t;
+  d.style.background = (t === 'dark') ? '#101216' : '#ffffff';
+  d.style.colorScheme = t;
+})();
+</script>
+
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" id="themeMeta" content="#ffffff">
 <meta name="mobile-web-app-capable" content="yes">
@@ -20,15 +33,18 @@
 
 <style>
 :root{
+  color-scheme: light;
   --ink:#14161a; --paper:#ffffff; --panel:#ffffff; --rule:#e6e8ec;
   --dim:#8d939c; --dimmer:#b8bcc4; --urgent:#e5352b;
   --markpos:58%; --soft:#f6f7f9;
 }
 html[data-theme="dark"]{
+  color-scheme: dark;
   --ink:#eef1f6; --paper:#101216; --panel:#171a20; --rule:#2a2f38;
   --dim:#878e9b; --dimmer:#5c636f; --urgent:#ff6b62;
   --markpos:88%; --soft:#171a20;
 }
+html{background:var(--paper);transition:background .2s ease}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:var(--paper)}
 body{
@@ -39,6 +55,8 @@ body{
   transition:background .18s,color .18s;
 }
 button,input,textarea{font-family:inherit;color:inherit}
+button, .tab, header, .fab, .dcell{user-select:none;-webkit-user-select:none}
+img{-webkit-user-drag:none}
 [hidden]{display:none!important}
 
 header{position:sticky;top:0;z-index:20;background:var(--paper);
@@ -303,7 +321,7 @@ input[type=date]{color-scheme:light dark}
   <div class="fsrow">
     <button id="fsMinus">가−</button><span id="fsVal">100%</span><button id="fsPlus">가＋</button>
   </div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-bottom:0">v21</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-bottom:0">v24</p>
 </main>
 
 <button class="fab" id="fab" aria-label="새 안내 작성">+</button>
@@ -471,7 +489,10 @@ let theme = localStorage.getItem('theme') ||
   (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
 function applyTheme(t){
   theme = t;
-  document.documentElement.dataset.theme = t;
+  const d = document.documentElement;
+  d.dataset.theme = t;
+  d.style.background = t === 'dark' ? '#101216' : '#ffffff';
+  d.style.colorScheme = t;
   themeBtn.textContent = t === 'dark' ? '☀' : '☾';
   themeMeta.setAttribute('content', t === 'dark' ? '#101216' : '#ffffff');
   localStorage.setItem('theme', t);
@@ -633,7 +654,7 @@ window.openDetail = id => {
     <div class="dtl-foot"><span>3반 알리미</span><span>${i.updatedAt?'수정됨 · ':''}${i.createdAt?new Date(i.createdAt).toLocaleDateString('ko-KR')+' 등록':''}</span></div>`;
 
   document.querySelectorAll('#detailBody .dtl-imgs img').forEach((img, n) =>
-    img.onclick = () => openLightbox(i.images, n));
+    img.onclick = () => openLightbox(i.images, n, i.title));
   document.getElementById('delBtn').hidden = !isAdmin;
   document.getElementById('editBtn').hidden = !isAdmin;
   openSheet('detail');
@@ -657,11 +678,12 @@ document.getElementById('shareBtn').onclick = async () => {
 
 /* ═══ 사진 뷰어 (여러 장 넘김) ═══ */
 const lb = document.getElementById('lightbox');
-let lbList = [], lbIdx = 0;
+let lbList = [], lbIdx = 0, lbName = '사진';
 
-function openLightbox(list, idx = 0){
+function openLightbox(list, idx = 0, name = '사진'){
   lbList = Array.isArray(list) ? list : [list];
   lbIdx = Math.min(idx, lbList.length - 1);
+  lbName = name;
   lbShow();
   lb.classList.add('on'); document.body.style.overflow='hidden';
   pushLayer(hideLightbox);
@@ -705,7 +727,8 @@ document.getElementById('lbImg').onclick = e => e.stopPropagation();
 document.getElementById('lbSave').onclick = async e => {
   e.stopPropagation();
   const src = document.getElementById('lbImg').src; if(!src) return;
-  const name = `3반알리미_${String(current?.title||'사진').replace(/[\\/:*?"<>|\s]+/g,'_').slice(0,20)}.jpg`;
+  const name = `3반알리미_${String(lbName || '사진').replace(/[\\/:*?"<>|\s]+/g,'_').slice(0,20)}` +
+    (lbList.length > 1 ? `_${lbIdx+1}` : '') + '.jpg';
   try{
     const blob = await (await fetch(src)).blob();
     const url = URL.createObjectURL(blob);
@@ -919,10 +942,17 @@ function maybeNotify(force){
   }catch{}
 }
 
-// 이미 켜둔 사람은 토큰이 만료됐을 수 있으니 조용히 갱신
-if(notifyOn && 'Notification' in window && Notification.permission === 'granted'){
-  addEventListener('load', () => setTimeout(subscribe, 2500));
-}
+// 저장소가 자동으로 비워지지 않도록 브라우저에 요청
+if(navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(()=>{});
+
+// 브라우저 데이터가 지워졌어도 알림 권한이 남아 있으면 조용히 다시 등록
+addEventListener('load', () => setTimeout(async () => {
+  if(!('Notification' in window) || Notification.permission !== 'granted') return;
+  const saved = localStorage.getItem('notify');
+  if(saved === '0') return;                  // 사용자가 직접 끈 경우는 존중
+  const ok = await subscribe();              // 켜둔 상태거나 기록이 지워진 경우
+  if(ok && !notifyOn){ notifyOn = true; localStorage.setItem('notify','1'); paintBell(); }
+}, 2500));
 
 /* ═══ 건의 ═══ */
 let unsubMsg = null;
@@ -980,7 +1010,7 @@ function watchMessages(on){
 
     document.querySelectorAll('#inboxBody .mimgs').forEach(mbox => {
       const srcs = [...mbox.querySelectorAll('img')].map(i => i.src);
-      mbox.querySelectorAll('img').forEach((img, n) => img.onclick = () => openLightbox(srcs, n));
+      mbox.querySelectorAll('img').forEach((img, n) => img.onclick = () => openLightbox(srcs, n, '건의사진'));
     });
     document.querySelectorAll('#inboxBody .mdel').forEach(b => b.onclick = async () => {
       if(!await ask('쪽지 삭제', '이 메시지를 삭제할까요?', '삭제', true)) return;
@@ -1013,14 +1043,32 @@ onAuthStateChanged(auth, user => {
 });
 
 document.getElementById('loginBtn').onclick = async () => {
+  const email = document.getElementById('aEmail').value.trim();
+  const pw = document.getElementById('aPw').value;
   try{
-    await signInWithEmailAndPassword(auth,
-      document.getElementById('aEmail').value.trim(),
-      document.getElementById('aPw').value);
+    await signInWithEmailAndPassword(auth, email, pw);
+    // 기기의 비밀번호 관리자에 저장 → 인터넷 기록을 지워도 자동 재로그인
+    try{
+      if(window.PasswordCredential){
+        await navigator.credentials.store(
+          new PasswordCredential({ id: email, password: pw, name: '3반 알리미 관리자' }));
+      }
+    }catch{}
     document.getElementById('aPw').value = '';
     toast('관리자 모드');
   }catch{ toast('이메일이나 비밀번호를 확인해 주세요'); }
 };
+
+// 앱 시작 시 저장된 계정으로 조용히 재로그인 시도
+if(window.PasswordCredential){
+  setTimeout(async () => {
+    if(isAdmin) return;
+    try{
+      const c = await navigator.credentials.get({ password:true, mediation:'silent' });
+      if(c && c.password) await signInWithEmailAndPassword(auth, c.id, c.password);
+    }catch{}
+  }, 1800);
+}
 
 /* ═══ 분류 관리 ═══ */
 document.getElementById('gearBtn').onclick = () => {
