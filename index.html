@@ -636,12 +636,13 @@ async function subscribe(){
   if(perm !== 'granted'){ toast('알림 권한이 거부됐어요'); return false; }
 
   const m = await initMessaging();
-  if(!m){ toast('이 브라우저에서는 푸시를 지원하지 않아요'); return false; }
+  if(!m){ alert('이 브라우저에서는 푸시를 지원하지 않아요.\n크롬에서 열었는지 확인해 주세요.'); return false; }
 
   try{
-    swReg = swReg || await navigator.serviceWorker.ready;
+    if(!('serviceWorker' in navigator)) throw new Error('서비스워커 미지원');
+    swReg = await navigator.serviceWorker.ready;
     const token = await getToken(m, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
-    if(!token){ toast('알림 등록에 실패했어요'); return false; }
+    if(!token) throw new Error('토큰이 비어 있음');
     await setDoc(doc(db,'tokens',token), {
       createdAt: serverTimestamp(),
       ua: navigator.userAgent.slice(0,120)
@@ -649,7 +650,8 @@ async function subscribe(){
     localStorage.setItem('fcmToken', token);
     return true;
   }catch(err){
-    toast('알림 등록 실패 — 잠시 후 다시 시도해 주세요');
+    const msg = (err && (err.code || err.message)) || String(err);
+    alert('알림 등록 실패\n\n' + msg + '\n\n이 내용을 그대로 알려주세요.');
     return false;
   }
 }
