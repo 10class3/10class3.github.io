@@ -603,28 +603,85 @@ onSnapshot(query(COL, orderBy('createdAt','desc'), limit(150)), snap => {
     '<div class="empty"><b>연결에 실패했어요</b>Firebase 설정을 확인해 주세요</div>';
 });
 
-/* ═══ 임박 알림 (기기 알림) ═══ */
+/* ═══ 알림 (푸시 + 임박 리마인더) ═══ */
+const TOKENS = collection(db, 'tokens');
 const bell = document.getElementById('bellBtn');
 let notifyOn = localStorage.getItem('notify') === '1';
+let swReg = null, messaging = null;
+
 function paintBell(){
   bell.textContent = notifyOn ? '🔔' : '🔕';
   bell.setAttribute('aria-pressed', notifyOn ? 'true' : 'false');
 }
 paintBell();
 
-bell.onclick = async () => {
-  if(notifyOn){
-    notifyOn = false; localStorage.setItem('notify','0'); paintBell();
-    toast('임박 알림을 껐어요'); return;
+async function initMessaging(){
+  if(messaging) return messaging;
+  if(!(await isSupported())) return null;
+  messaging = getMessaging(app);
+  onMessage(messaging, p => {                 // 앱을 보고 있을 때
+    const d = p.data || {};
+    toast(`${d.title || '새 알림'} — ${d.body || ''}`.slice(0,60));
+    render();
+  });
+  return messaging;
+}
+
+async function subscribe(){
+  if(!('Notification' in window)){ toast('이 브라우저는 알림을 지원하지 않아요'); return false; }
+  if(isIOS && !standalone){
+    toast('아이폰은 홈 화면에 설치한 뒤에 알림을 켤 수 있어요'); return false;
   }
-  if(!('Notification' in window)){ toast('이 브라우저는 알림을 지원하지 않아요'); return; }
-  const p = await Notification.requestPermission();
-  if(p !== 'granted'){ toast('알림 권한이 거부됐어요'); return; }
-  notifyOn = true; localStorage.setItem('notify','1'); paintBell();
-  toast('앱을 열 때 D-2 이내 일정을 알려드려요');
-  maybeNotify(true);
+  const perm = await Notification.requestPermission();
+  if(perm !== 'granted'){ toast('알림 권한이 거부됐어요'); return false; }
+
+  const m = await initMessaging();
+  if(!m){ toast('이 브라우저에서는 푸시를 지원하지 않아요'); return false; }
+
+  try{
+    swReg = swReg || await navigator.serviceWorker.ready;
+    const token = await getToken(m, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
+    if(!token){ toast('알림 등록에 실패했어요'); return false; }
+    await setDoc(doc(db,'tokens',token), {
+      createdAt: serverTimestamp(),
+      ua: navigator.userAgent.slice(0,120)
+    });
+    localStorage.setItem('fcmToken', token);
+    return true;
+  }catch(err){
+    toast('알림 등록 실패 — 잠시 후 다시 시도해 주세요');
+    return false;
+  }
+}
+
+async function unsubscribe(){
+  const token = localStorage.getItem('fcmToken');
+  try{
+    if(token) await deleteDoc(doc(db,'tokens',token));
+    const m = await initMessaging();
+    if(m) await deleteToken(m);
+  }catch{}
+  localStorage.removeItem('fcmToken');
+}
+
+bell.onclick = async () => {
+  bell.disabled = true;
+  if(notifyOn){
+    await unsubscribe();
+    notifyOn = false; localStorage.setItem('notify','0'); paintBell();
+    toast('알림을 껐어요');
+  }else{
+    const ok = await subscribe();
+    if(ok){
+      notifyOn = true; localStorage.setItem('notify','1'); paintBell();
+      toast('새 공지와 D-2 이내 일정을 알려드려요');
+      maybeNotify(true);
+    }
+  }
+  bell.disabled = false;
 };
 
+// 앱을 열었을 때의 임박 리마인더 (푸시와 별개로 동작)
 function maybeNotify(force){
   if(!notifyOn || !('Notification' in window) || Notification.permission !== 'granted') return;
   const key = 'notified-' + TODAY.toISOString().slice(0,10);
@@ -641,6 +698,11 @@ function maybeNotify(force){
     });
     localStorage.setItem(key, '1');
   }catch{}
+}
+
+// 이미 켜둔 사람은 토큰이 만료됐을 수 있으니 조용히 갱신
+if(notifyOn && 'Notification' in window && Notification.permission === 'granted'){
+  addEventListener('load', () => setTimeout(subscribe, 2500));
 }
 
 /* ═══ 건의 ═══ */
