@@ -950,11 +950,38 @@ document.getElementById('saveBtn').onclick = async () => {
     }else{
       await addDoc(COL, { ...payload, createdAt: serverTimestamp() });
       toast('올렸어요');
+      pushNotice(payload);          // 새 공지만 알림 발송
     }
     closeSheet('write'); editId = null;
   }catch{ toast('저장에 실패했어요. 사진 수를 줄여보세요'); }
   btn.disabled = false; btn.textContent = label;
 };
+
+/* ═══ 새 공지 알림 발송 (관리자) ═══ */
+const PUSH_URL = 'https://class3-push.peakhohihi1988.workers.dev/';
+
+async function pushNotice(p){
+  const user = auth.currentUser;
+  if(!user) return;
+  try{
+    const idToken = await user.getIdToken();
+    const when = p.date ? korDate(p.date) : '';
+    const res = await fetch(PUSH_URL, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        idToken,
+        title: `[${catName(p.cat)}] ${p.title}`,
+        body: when ? when + ' · 앱에서 확인하세요' : '새 안내가 등록됐어요'
+      })
+    });
+    const d = await res.json();
+    if(d.ok) toast(`알림 ${d.sent}명에게 보냈어요`);
+    else toast('알림 발송 실패: ' + (d.error || ''));
+  }catch{
+    toast('알림 서버에 연결하지 못했어요');
+  }
+}
 
 /* ═══ 설치 ═══ */
 document.getElementById('today').textContent =
