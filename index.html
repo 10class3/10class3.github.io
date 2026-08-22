@@ -215,18 +215,22 @@ html.booting header,
 html.booting main,
 html.booting .fab{visibility:hidden}
 #boot{position:fixed;inset:0;z-index:200;background:#1e2430;
-  display:flex;align-items:center;justify-content:center;
-  transition:opacity .35s ease}
+  display:flex;align-items:center;justify-content:center;overflow:hidden;
+  transition:opacity .3s ease .25s}
 #boot.off{opacity:0;pointer-events:none}
-.bootbars{width:150px;display:flex;flex-direction:column;gap:11px}
-.bootbars i{height:13px;border-radius:7px;width:0;transform-origin:left center;
-  animation:draw .5s cubic-bezier(.22,.9,.3,1) forwards}
-.bootbars i:nth-child(1){background:#ffe95c;--w:100%;animation-delay:.05s}
-.bootbars i:nth-child(2){background:#c9b8ff;--w:77%; animation-delay:.19s}
-.bootbars i:nth-child(3){background:#a3efc9;--w:55%; animation-delay:.33s}
-@keyframes draw{from{width:0}to{width:var(--w)}}
+
+/* 스플래시에 떠 있던 3줄 그대로 시작 → 화면 밖으로 뻗어나가며 사라짐 */
+.bootbars{width:150px;display:flex;flex-direction:column;gap:11px;
+  transition:width .55s cubic-bezier(.65,0,.35,1)}
+.bootbars i{height:13px;border-radius:7px;display:block;
+  transition:width .55s cubic-bezier(.65,0,.35,1), border-radius .3s linear}
+.bootbars i:nth-child(1){background:#ffe95c;width:100%}
+.bootbars i:nth-child(2){background:#c9b8ff;width:77%; transition-delay:.06s}
+.bootbars i:nth-child(3){background:#a3efc9;width:55%; transition-delay:.12s}
+#boot.go .bootbars{width:100vw}
+#boot.go .bootbars i{width:100%;border-radius:0}
 @media (prefers-reduced-motion:reduce){
-  .bootbars i{animation:none;width:var(--w)}
+  .bootbars, .bootbars i{transition:none}
 }
 
 /* 주간 보기 */
@@ -522,7 +526,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v33</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v34</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1513,11 +1517,14 @@ function bootDone(){
   const root = document.documentElement;
   const b = document.getElementById('boot');
   if(!root.classList.contains('booting')){ if(b) b.remove(); return; }
-  setTimeout(() => {                       // 형광펜이 다 그어질 시간 확보
-    root.classList.remove('booting');
-    root.style.background = theme === 'dark' ? '#101216' : '#ffffff';
-    if(b){ b.classList.add('off'); setTimeout(() => b.remove(), 400); }
-  }, 420);
+  setTimeout(() => {
+    if(b) b.classList.add('go');           // 형광펜이 화면 밖으로 뻗어나감
+    setTimeout(() => {
+      root.classList.remove('booting');
+      root.style.background = theme === 'dark' ? '#101216' : '#ffffff';
+      if(b){ b.classList.add('off'); setTimeout(() => b.remove(), 450); }
+    }, 340);
+  }, 220);
 }
 setTimeout(bootDone, 2500);   // 연결이 늦어도 화면이 막히지 않게
 
