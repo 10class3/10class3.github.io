@@ -221,7 +221,7 @@ input[type=date]{color-scheme:light dark}
   <div id="urgentBox"></div>
   <div id="list"><div class="empty">불러오는 중…</div></div>
   <button class="reportBtn" id="reportBtn">오류 신고 · 건의하기</button>
-  <p class="hint" style="text-align:center;margin-bottom:0">3반 알리미 v13</p>
+  <p class="hint" style="text-align:center;margin-bottom:0">3반 알리미 v14</p>
 </main>
 
 <button class="fab" id="fab" aria-label="새 안내 작성">+</button>
@@ -963,7 +963,7 @@ const PUSH_URL = 'https://class3-push.peakhohihi1988.workers.dev/';
 
 async function pushNotice(p){
   const user = auth.currentUser;
-  if(!user) return;
+  if(!user){ alert('알림: 로그인 정보가 없어요'); return; }
   try{
     const idToken = await user.getIdToken();
     const when = p.date ? korDate(p.date) : '';
@@ -976,11 +976,13 @@ async function pushNotice(p){
         body: when ? when + ' · 앱에서 확인하세요' : '새 안내가 등록됐어요'
       })
     });
-    const d = await res.json();
-    if(d.ok) toast(`알림 ${d.sent}명에게 보냈어요`);
-    else toast('알림 발송 실패: ' + (d.error || ''));
-  }catch{
-    toast('알림 서버에 연결하지 못했어요');
+    const raw = await res.text();
+    let d = {};
+    try{ d = JSON.parse(raw); }catch{}
+    if(d.ok) alert(`알림 발송 완료\n\n보낸 기기: ${d.sent}대\n정리된 만료 토큰: ${d.removed}개`);
+    else alert('알림 발송 실패\n\nHTTP ' + res.status + '\n' + raw.slice(0,300));
+  }catch(err){
+    alert('알림 서버 연결 실패\n\n' + (err && err.message || err));
   }
 }
 
