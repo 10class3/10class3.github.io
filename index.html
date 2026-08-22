@@ -58,7 +58,7 @@ button,input,textarea{font-family:inherit;color:inherit}
 /* 기본은 선택 불가 — 네이티브 앱처럼 */
 body{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
 /* 복사가 필요한 곳만 허용 */
-.dtl-body, .dtl-title, .msg .mt, input, textarea{
+.dtl-body, .msg .mt, input, textarea{
   user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
 img{-webkit-user-drag:none;pointer-events:auto}
 /* 오버스크롤 시 브라우저 새로고침·바운스 방지 */
@@ -332,7 +332,7 @@ input[type=date]{color-scheme:light dark}
   <div class="fsrow">
     <button id="fsMinus">가−</button><span id="fsVal">100%</span><button id="fsPlus">가＋</button>
   </div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-bottom:0">v26</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-bottom:0">v27</p>
 </main>
 
 <button class="fab" id="fab" aria-label="새 안내 작성">+</button>
@@ -1508,6 +1508,15 @@ if('serviceWorker' in navigator) addEventListener('load', () => navigator.servic
 
 addEventListener('keydown', e => {
   if(e.key === 'Escape' && layers.length) history.back();
+});
+
+// 길게 누를 때 브라우저 메뉴가 뜨지 않게 (사진 뷰어 안에서는 저장을 위해 허용)
+addEventListener('contextmenu', e => {
+  if(lb.classList.contains('on') && e.target.id === 'lbImg') return;
+  const t = e.target;
+  if(t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
+  if(t.closest && t.closest('.dtl-body, .msg .mt')) return;
+  e.preventDefault();
 });
 
 renderTabs(); drawCatPick(); sessions = [{label:'',date:''}]; drawSessions();
