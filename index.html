@@ -200,6 +200,22 @@ input[type=date]{color-scheme:light dark}
 .crow input{flex:1;padding:11px 12px;font-size:15px}
 .crow .del{background:none;border:0;color:var(--dim);font-size:19px;cursor:pointer;padding:4px 2px;flex-shrink:0}
 
+/* 앱 시작 화면 — 스플래시와 같은 색에서 형광펜이 그어짐 */
+#boot{position:fixed;inset:0;z-index:200;background:#1e2430;
+  display:flex;align-items:center;justify-content:center;
+  transition:opacity .35s ease}
+#boot.off{opacity:0;pointer-events:none}
+.bootbars{width:150px;display:flex;flex-direction:column;gap:11px}
+.bootbars i{height:13px;border-radius:7px;width:0;transform-origin:left center;
+  animation:draw .5s cubic-bezier(.22,.9,.3,1) forwards}
+.bootbars i:nth-child(1){background:#ffe95c;--w:100%;animation-delay:.05s}
+.bootbars i:nth-child(2){background:#c9b8ff;--w:77%; animation-delay:.19s}
+.bootbars i:nth-child(3){background:#a3efc9;--w:55%; animation-delay:.33s}
+@keyframes draw{from{width:0}to{width:var(--w)}}
+@media (prefers-reduced-motion:reduce){
+  .bootbars i{animation:none;width:var(--w)}
+}
+
 /* 주간 보기 */
 .weekbar{display:flex;gap:5px;padding:14px 0 4px}
 .wd{flex:1;border:1.5px solid transparent;border-radius:10px;padding:7px 2px 8px;text-align:center;
@@ -341,6 +357,8 @@ input[type=date]{color-scheme:light dark}
 </style>
 </head>
 <body>
+
+<div id="boot"><div class="bootbars"><i></i><i></i><i></i></div></div>
 
 <header>
   <div class="hrow">
@@ -491,7 +509,7 @@ input[type=date]{color-scheme:light dark}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v29</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v30</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1010,7 +1028,7 @@ onSnapshot(query(COL, orderBy('createdAt','desc'), limit(150)), snap => {
              body:v.body||'', images:v.images||[],
              createdAt:v.createdAt?.toMillis?.()||null, updatedAt:v.updatedAt?.toMillis?.()||null };
   });
-  render(); maybeNotify();
+  render(); maybeNotify(); bootDone();
 }, () => {
   document.getElementById('list').innerHTML =
     '<div class="empty"><b>연결에 실패했어요</b>Firebase 설정을 확인해 주세요</div>';
@@ -1468,6 +1486,20 @@ document.getElementById('saveBtn').onclick = async () => {
   }catch{ toast('저장에 실패했어요. 사진 수를 줄여보세요'); }
   btn.disabled = false; btn.textContent = label;
 };
+
+/* ═══ 시작 화면 종료 ═══ */
+let booted = false;
+function bootDone(){
+  if(booted) return;
+  booted = true;
+  const b = document.getElementById('boot');
+  // 형광펜이 다 그어질 시간은 확보하고 사라짐
+  setTimeout(() => {
+    b.classList.add('off');
+    setTimeout(() => b.remove(), 400);
+  }, 380);
+}
+setTimeout(bootDone, 2500);   // 연결이 늦어도 화면이 막히지 않게
 
 /* ═══ 검색 · 글자 크기 · 당겨서 새로고침 ═══ */
 const searchRow = document.getElementById('searchRow');
