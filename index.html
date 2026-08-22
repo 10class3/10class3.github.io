@@ -522,7 +522,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v32</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v33</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -689,7 +689,8 @@ function render(){
 
   document.querySelectorAll('[data-n]').forEach(el => {
     const c = el.dataset.n;
-    el.textContent = all.filter(e => (c==='all'||e.item.cat===c) && (!e.date || dday(e.date) >= 0)).length || '';
+    el.textContent = all.filter(e => (c==='all'||e.item.cat===c) &&
+      (e.item.pin || !e.date || dday(e.date) >= 0)).length || '';
   });
 
   renderUrgent(all);
@@ -805,7 +806,10 @@ window.openDetail = id => {
   const i = items.find(x => x.id === id); if(!i) return;
   current = i;
   const imgs = (i.images||[]).map((s,n)=>`<img src="${s}" alt="사진 ${n+1}">`).join('');
-  setDoc(doc(db,'reads', `${i.id}_${devId}`), { n:i.id, at:serverTimestamp() }).catch(()=>{});
+  if(!localStorage.getItem('read_'+i.id)){
+    setDoc(doc(db,'reads', `${i.id}_${devId}`), { n:i.id, at:serverTimestamp() })
+      .then(() => localStorage.setItem('read_'+i.id, '1')).catch(()=>{});
+  }
 
   let sched;
   if(i.sessions && i.sessions.length){
@@ -1141,6 +1145,7 @@ bell.onclick = async () => {
 // 앱을 열었을 때의 임박 리마인더 (푸시와 별개로 동작)
 function maybeNotify(force){
   if(!notifyOn || !('Notification' in window) || Notification.permission !== 'granted') return;
+  if(localStorage.getItem('fcmToken')) return;   // 푸시를 받는 기기는 중복 알림 생략
   const key = 'notified-' + TODAY.toISOString().slice(0,10);
   if(!force && localStorage.getItem(key)) return;
 
@@ -1530,6 +1535,9 @@ searchInp.oninput = () => { searchQ = searchInp.value; render(); };
 document.getElementById('searchX').onclick = () => {
   searchRow.hidden = true; searchInp.value = ''; searchQ = ''; render();
 };
+
+// 주간 보기를 끄면 날짜 선택도 함께 해제
+addEventListener('pageshow', () => { if(!weekOn) weekPick = ''; });
 
 let fs = parseInt(localStorage.getItem('fs') || '100', 10);
 function applyFs(){
