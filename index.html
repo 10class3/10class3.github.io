@@ -15,6 +15,15 @@
   d.dataset.theme = t;
   d.style.background = (t === 'dark') ? '#101216' : '#ffffff';
   d.style.colorScheme = t;
+
+  // 앱을 새로 열었을 때만 시작 애니메이션 (새로고침은 제외)
+  try{
+    if(!sessionStorage.getItem('seen')){
+      sessionStorage.setItem('seen','1');
+      d.classList.add('booting');
+      d.style.background = '#1e2430';
+    }
+  }catch(e){}
 })();
 </script>
 
@@ -201,6 +210,10 @@ input[type=date]{color-scheme:light dark}
 .crow .del{background:none;border:0;color:var(--dim);font-size:19px;cursor:pointer;padding:4px 2px;flex-shrink:0}
 
 /* 앱 시작 화면 — 스플래시와 같은 색에서 형광펜이 그어짐 */
+html:not(.booting) #boot{display:none}
+html.booting header,
+html.booting main,
+html.booting .fab{visibility:hidden}
 #boot{position:fixed;inset:0;z-index:200;background:#1e2430;
   display:flex;align-items:center;justify-content:center;
   transition:opacity .35s ease}
@@ -509,7 +522,7 @@ input[type=date]{color-scheme:light dark}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v31</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v32</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1492,12 +1505,14 @@ let booted = false;
 function bootDone(){
   if(booted) return;
   booted = true;
+  const root = document.documentElement;
   const b = document.getElementById('boot');
-  // 형광펜이 다 그어질 시간은 확보하고 사라짐
-  setTimeout(() => {
-    b.classList.add('off');
-    setTimeout(() => b.remove(), 400);
-  }, 380);
+  if(!root.classList.contains('booting')){ if(b) b.remove(); return; }
+  setTimeout(() => {                       // 형광펜이 다 그어질 시간 확보
+    root.classList.remove('booting');
+    root.style.background = theme === 'dark' ? '#101216' : '#ffffff';
+    if(b){ b.classList.add('off'); setTimeout(() => b.remove(), 400); }
+  }, 420);
 }
 setTimeout(bootDone, 2500);   // 연결이 늦어도 화면이 막히지 않게
 
