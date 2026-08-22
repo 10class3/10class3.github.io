@@ -1,6 +1,6 @@
 // 앱 내용을 수정하고 반영이 안 되면 아래 숫자를 v2, v3... 으로 올리세요
-const CACHE = 'banner-v7';
-const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+const CACHE = 'banner-v8';
+const ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './favicon-light.png', './favicon-dark.png'];
 
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));

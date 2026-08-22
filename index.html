@@ -12,6 +12,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="3반 알리미">
 <link rel="apple-touch-icon" href="./icon-192.png">
+<link rel="icon" href="./favicon-light.png" media="(prefers-color-scheme: light)">
+<link rel="icon" href="./favicon-dark.png" media="(prefers-color-scheme: dark)">
 <meta name="description" content="3반 수행평가·행사·생기부 안내">
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
@@ -152,6 +154,20 @@ input[type=date]{color-scheme:light dark}
 .crow input{flex:1;padding:11px 12px;font-size:15px}
 .crow .del{background:none;border:0;color:var(--dim);font-size:19px;cursor:pointer;padding:4px 2px;flex-shrink:0}
 
+.reportBtn{
+  display:block;width:100%;margin:34px 0 8px;padding:15px;border:1.5px solid var(--rule);
+  background:transparent;border-radius:12px;color:var(--dim);
+  font-size:13.5px;font-weight:700;letter-spacing:-.03em;cursor:pointer;
+}
+.msg{padding:16px 0;border-bottom:1px solid var(--rule)}
+.msg .mh{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:7px}
+.msg .who{font-size:13px;font-weight:800;letter-spacing:-.03em}
+.msg .when{font-size:11.5px;color:var(--dimmer);font-weight:600;flex-shrink:0}
+.msg .mt{font-size:14.5px;line-height:1.6;white-space:pre-wrap;letter-spacing:-.02em;word-break:keep-all;margin:0}
+.msg .mdel{background:none;border:0;color:var(--urgent);font-size:11.5px;font-weight:700;cursor:pointer;padding:8px 0 0}
+.badge{background:var(--urgent);color:#fff;border-radius:999px;font-size:10px;font-weight:800;
+  padding:1px 5px;margin-left:5px;vertical-align:1px}
+
 .fab{position:fixed;right:20px;bottom:calc(env(safe-area-inset-bottom) + 22px);z-index:30;
   width:56px;height:56px;border-radius:50%;border:0;background:var(--ink);color:var(--paper);
   font-size:27px;font-weight:300;line-height:1;cursor:pointer;display:none;box-shadow:0 6px 20px rgba(0,0,0,.28)}
@@ -185,6 +201,7 @@ input[type=date]{color-scheme:light dark}
     </div>
     <div class="hact">
       <button class="iconbtn" id="themeBtn" aria-label="화면 모드 전환">☾</button>
+      <button class="hbtn ghost" id="mailBtn" hidden>쪽지</button>
       <button class="hbtn ghost" id="gearBtn" hidden>분류</button>
       <button class="hbtn" id="installBtn" hidden>설치</button>
     </div>
@@ -192,7 +209,31 @@ input[type=date]{color-scheme:light dark}
   <div class="tabs" role="tablist" id="tabs"></div>
 </header>
 
-<main><div id="list"><div class="empty">불러오는 중…</div></div></main>
+<main>
+  <div id="list"><div class="empty">불러오는 중…</div></div>
+  <button class="reportBtn" id="reportBtn">오류 신고 · 건의하기</button>
+</main>
+
+<section class="sheet" id="report">
+  <div class="sheettop">
+    <button class="xbtn" onclick="closeSheet('report')">← 닫기</button>
+    <span style="font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--dimmer)">관리자에게 보내기</span>
+  </div>
+  <p class="hint" style="margin:0">잘못된 내용, 빠진 공지, 앱 오류 등 무엇이든 보내주세요. 로그인 없이 익명으로 전달됩니다.</p>
+  <label class="f" for="rName">이름 (선택)</label>
+  <input type="text" id="rName" maxlength="20" placeholder="비워도 돼요">
+  <label class="f" for="rText">내용</label>
+  <textarea id="rText" maxlength="500" placeholder="예) 국어 수행평가 날짜가 9월 5일로 바뀌었어요"></textarea>
+  <button class="primary" id="rSend">보내기</button>
+</section>
+
+<section class="sheet" id="inbox">
+  <div class="sheettop">
+    <button class="xbtn" onclick="closeSheet('inbox')">← 닫기</button>
+    <span style="font-size:12px;font-weight:700;letter-spacing:.04em;color:var(--dimmer)">받은 메시지</span>
+  </div>
+  <div id="inboxBody"></div>
+</section>
 
 <button class="fab" id="fab" aria-label="새 안내 작성">+</button>
 
@@ -475,6 +516,62 @@ onSnapshot(query(COL, orderBy('createdAt','desc')), snap => {
     '<div class="empty"><b>연결에 실패했어요</b>Firebase 설정을 확인해 주세요</div>';
 });
 
+/* ═══ 건의 메시지 ═══ */
+const MSG = collection(db, 'messages');
+let unsubMsg = null;
+
+document.getElementById('reportBtn').onclick = () => {
+  document.getElementById('rText').value = '';
+  openSheet('report');
+};
+
+document.getElementById('rSend').onclick = async () => {
+  const text = document.getElementById('rText').value.trim();
+  if(!text){ toast('내용을 입력해 주세요'); return; }
+  const btn = document.getElementById('rSend');
+  btn.disabled = true; btn.textContent = '보내는 중…';
+  try{
+    await addDoc(MSG, {
+      name: document.getElementById('rName').value.trim().slice(0,20),
+      text, createdAt: serverTimestamp()
+    });
+    closeSheet('report'); toast('보냈어요. 고마워요!');
+  }catch{ toast('전송에 실패했어요. 잠시 후 다시 시도해 주세요'); }
+  btn.disabled = false; btn.textContent = '보내기';
+};
+
+// 관리자만 메시지를 읽음
+function watchMessages(on){
+  const mailBtn = document.getElementById('mailBtn');
+  if(!on){
+    if(unsubMsg){ unsubMsg(); unsubMsg = null; }
+    mailBtn.hidden = true; return;
+  }
+  mailBtn.hidden = false;
+  unsubMsg = onSnapshot(query(MSG, orderBy('createdAt','desc')), snap => {
+    const list = snap.docs.map(d => ({ id:d.id, ...d.data(),
+      createdAt: d.data().createdAt?.toMillis?.() || null }));
+    mailBtn.innerHTML = '쪽지' + (list.length ? `<span class="badge">${list.length}</span>` : '');
+    document.getElementById('inboxBody').innerHTML = list.length
+      ? list.map(m => `<div class="msg">
+          <div class="mh">
+            <span class="who">${esc(m.name || '익명')}</span>
+            <span class="when">${m.createdAt ? new Date(m.createdAt).toLocaleString('ko-KR',{month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}) : ''}</span>
+          </div>
+          <p class="mt">${esc(m.text)}</p>
+          <button class="mdel" data-mid="${m.id}">삭제</button>
+        </div>`).join('')
+      : '<div class="empty"><b>받은 메시지가 없어요</b>친구들이 보낸 건의가 여기 쌓입니다</div>';
+
+    document.querySelectorAll('#inboxBody .mdel').forEach(b => b.onclick = async () => {
+      if(!confirm('이 메시지를 삭제할까요?')) return;
+      try{ await deleteDoc(doc(db,'messages',b.dataset.mid)); }catch{ toast('삭제 실패'); }
+    });
+  }, () => {});
+}
+
+document.getElementById('mailBtn').onclick = () => openSheet('inbox');
+
 /* ═══ 관리자 ═══ */
 let taps = 0, tapTimer;
 document.getElementById('brand').onclick = () => {
@@ -491,6 +588,7 @@ onAuthStateChanged(auth, user => {
   isAdmin = !!user;
   document.getElementById('fab').classList.toggle('on', isAdmin);
   document.getElementById('gearBtn').hidden = !isAdmin;
+  watchMessages(isAdmin);
   if(user) closeSheet('admin');
 });
 
