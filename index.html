@@ -69,7 +69,15 @@ header{position:sticky;top:0;z-index:20;background:var(--paper);
   padding:calc(env(safe-area-inset-top) + 18px) 20px 0;border-bottom:1px solid var(--rule)}
 .hrow{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
 .brand{cursor:pointer;user-select:none;flex:1;min-width:0}
-.brand h1{font-size:26px;font-weight:900;letter-spacing:-.045em;margin:0}
+.brand h1{font-size:26px;font-weight:900;letter-spacing:-.045em;margin:0;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.iconbtn.dot{position:relative}
+.iconbtn.dot::after{content:'';position:absolute;top:4px;right:5px;width:7px;height:7px;
+  border-radius:50%;background:var(--urgent)}
+.mrow2{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:15px 2px;border-bottom:1px solid var(--rule)}
+.mrow2 > span{font-size:15px;font-weight:700;letter-spacing:-.03em}
+.mrow2 .fsrow{margin:0}
 .brand .today{font-size:12.5px;font-weight:600;color:var(--dim);letter-spacing:-.02em;display:block;margin-top:3px}
 .hact{display:flex;gap:6px;flex-shrink:0;padding-top:3px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
 .hbtn{border:1.5px solid var(--ink);background:var(--ink);color:var(--paper);border-radius:999px;
@@ -343,11 +351,8 @@ input[type=date]{color-scheme:light dark}
     <div class="hact">
       <button class="iconbtn" id="weekBtn" aria-label="주간 보기" aria-pressed="false">▤</button>
       <button class="iconbtn" id="searchBtn" aria-label="검색">⌕</button>
-      <button class="iconbtn" id="bellBtn" aria-label="알림" aria-pressed="false"></button>
-      <button class="iconbtn" id="themeBtn" aria-label="화면 모드 전환">☾</button>
-      <button class="hbtn ghost" id="mailBtn" hidden>쪽지</button>
-      <button class="hbtn ghost" id="gearBtn" hidden>분류</button>
       <button class="hbtn" id="installBtn" hidden>설치</button>
+      <button class="iconbtn" id="moreBtn" aria-label="메뉴">⋯</button>
     </div>
   </div>
   <div class="tabs" role="tablist" id="tabs"></div>
@@ -366,10 +371,6 @@ input[type=date]{color-scheme:light dark}
     <div class="skel"><div class="sk" style="height:26px"></div><div><div class="sk" style="height:17px;width:62%"></div><div class="sk" style="height:12px;width:50%;margin-top:9px"></div></div></div>
   </div>
   <button class="reportBtn" id="reportBtn">오류 신고 · 건의하기</button>
-  <div class="fsrow">
-    <button id="fsMinus">가−</button><span id="fsVal">100%</span><button id="fsPlus">가＋</button>
-  </div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-bottom:0">v28</p>
 </main>
 
 <button class="fab" id="fab" aria-label="새 안내 작성">+</button>
@@ -473,6 +474,24 @@ input[type=date]{color-scheme:light dark}
   <label class="f" for="aPw">비밀번호</label>
   <input type="password" id="aPw" autocomplete="current-password">
   <button class="primary" id="loginBtn">로그인</button>
+</section>
+
+<section class="sheet" id="menu">
+  <div class="sheettop">
+    <button class="xbtn" onclick="closeSheet('menu')">← 닫기</button>
+    <span class="stitle">메뉴</span>
+  </div>
+  <div class="mrow2"><span>새 공지 알림</span>
+    <button class="iconbtn" id="bellBtn" aria-label="알림" aria-pressed="false"></button></div>
+  <div class="mrow2"><span>화면 모드</span>
+    <button class="iconbtn" id="themeBtn" aria-label="화면 모드 전환">☾</button></div>
+  <div class="mrow2"><span>글자 크기</span>
+    <div class="fsrow"><button id="fsMinus">가−</button><span id="fsVal">100%</span><button id="fsPlus">가＋</button></div></div>
+  <div class="mrow2" id="mailRow" hidden><span>받은 쪽지</span>
+    <button class="hbtn ghost" id="mailBtn">열기</button></div>
+  <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
+    <button class="hbtn ghost" id="gearBtn">열기</button></div>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v29</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -715,6 +734,8 @@ function renderWeek(all){
   document.getElementById('wPrev').onclick = () => { weekStart.setDate(weekStart.getDate()-7); weekPick=''; render(); };
   document.getElementById('wNext').onclick = () => { weekStart.setDate(weekStart.getDate()+7); weekPick=''; render(); };
 }
+
+document.getElementById('moreBtn').onclick = () => openSheet('menu');
 
 document.getElementById('weekBtn').onclick = () => {
   weekOn = !weekOn; weekPick = ''; weekStart = mondayOf(new Date());
@@ -1154,11 +1175,17 @@ document.getElementById('rSend').onclick = async () => {
 
 function watchMessages(on){
   const mailBtn = document.getElementById('mailBtn');
-  if(!on){ if(unsubMsg){ unsubMsg(); unsubMsg = null; } mailBtn.hidden = true; return; }
-  mailBtn.hidden = false;
+  const mailRow = document.getElementById('mailRow');
+  const moreBtn = document.getElementById('moreBtn');
+  if(!on){
+    if(unsubMsg){ unsubMsg(); unsubMsg = null; }
+    mailRow.hidden = true; moreBtn.classList.remove('dot'); return;
+  }
+  mailRow.hidden = false;
   unsubMsg = onSnapshot(query(MSG, orderBy('createdAt','desc'), limit(100)), snap => {
     const list = snap.docs.map(d => ({ id:d.id, ...d.data(), createdAt:d.data().createdAt?.toMillis?.()||null }));
-    mailBtn.innerHTML = '쪽지' + (list.length ? `<span class="badge">${list.length}</span>` : '');
+    mailBtn.innerHTML = list.length ? `열기<span class="badge">${list.length}</span>` : '열기';
+    moreBtn.classList.toggle('dot', list.length > 0);
     document.getElementById('inboxBody').innerHTML = list.length
       ? list.map(m => `<div class="msg">
           <div class="mh">
@@ -1198,7 +1225,7 @@ document.getElementById('brand').onclick = () => {
 onAuthStateChanged(auth, user => {
   isAdmin = !!user;
   document.getElementById('fab').classList.toggle('on', isAdmin);
-  document.getElementById('gearBtn').hidden = !isAdmin;
+  document.getElementById('gearRow').hidden = !isAdmin;
   document.getElementById('adminChip').hidden = !isAdmin;
   document.getElementById('verLine').hidden = !isAdmin;
   watchMessages(isAdmin);
