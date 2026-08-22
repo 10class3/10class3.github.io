@@ -216,6 +216,19 @@ input[type=date]{color-scheme:light dark}
 .fsrow button{width:44px;height:34px;border:1.5px solid var(--rule);border-radius:9px;background:transparent;
   font-size:13px;font-weight:800;cursor:pointer;color:var(--dim)}
 .fsrow span{font-size:12px;font-weight:700;color:var(--dimmer);min-width:42px;text-align:center}
+
+/* 설치 가이드 */
+.guide{display:flex;flex-direction:column;gap:18px;margin-top:4px}
+.gstep{border:1.5px solid var(--rule);border-radius:14px;overflow:hidden;background:var(--panel)}
+.gtext{display:flex;gap:11px;align-items:flex-start;padding:15px 16px 13px}
+.gnum{flex-shrink:0;width:23px;height:23px;border-radius:50%;background:var(--ink);color:var(--paper);
+  font-size:12.5px;font-weight:900;display:flex;align-items:center;justify-content:center}
+.gtext p{margin:0;font-size:14.5px;font-weight:700;letter-spacing:-.03em;line-height:1.5;word-break:keep-all}
+.gtext p b{background:linear-gradient(transparent var(--markpos),var(--c0) var(--markpos))}
+.gpic{background:var(--soft);border-top:1px solid var(--rule);padding:14px 16px;display:flex;justify-content:center}
+.gpic svg{width:100%;max-width:250px;height:auto;display:block}
+.gnote{font-size:12.5px;font-weight:700;color:var(--urgent);letter-spacing:-.03em;
+  line-height:1.5;margin:0 0 16px;word-break:keep-all}
 .adminchip{display:inline-block;margin-left:7px;padding:2px 7px;border-radius:5px;background:var(--ink);
   color:var(--paper);font-size:10px;font-weight:800;vertical-align:1px}
 
@@ -288,7 +301,7 @@ input[type=date]{color-scheme:light dark}
   <div class="fsrow">
     <button id="fsMinus">가−</button><span id="fsVal">100%</span><button id="fsPlus">가＋</button>
   </div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-bottom:0">v18</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-bottom:0">v19</p>
 </main>
 
 <button class="fab" id="fab" aria-label="새 안내 작성">+</button>
@@ -393,9 +406,10 @@ input[type=date]{color-scheme:light dark}
     <button class="xbtn" onclick="closeSheet('howto')">← 닫기</button>
     <span class="stitle">설치 안내</span>
   </div>
-  <div id="howtoBody" class="dtl-body" style="margin-top:0"></div>
+  <p class="gnote" id="howtoNote" hidden></p>
+  <div class="guide" id="howtoBody"></div>
   <button class="primary" id="copyLink">링크 복사하기</button>
-  <p class="hint">복사한 뒤 크롬 주소창에 붙여넣으면 설치할 수 있어요.</p>
+  <p class="hint">복사한 뒤 주소창에 붙여넣어도 돼요.</p>
 </section>
 
 <div class="lightbox" id="lightbox">
@@ -1207,10 +1221,11 @@ const UA = navigator.userAgent;
 const isAndroid = /android/i.test(UA);
 const isKakao   = /KAKAOTALK/i.test(UA);
 const inApp = /KAKAOTALK|NAVER|DaumApps|Instagram|FBAN|FBAV|FB_IAB|Line\/|everytime|Snapchat|Threads|Whale/i.test(UA);
-if(!standalone) iBtn.textContent = inApp ? (isIOS ? 'Safari로 열기' : '크롬으로 열기') : '설치';
+if(!standalone) iBtn.textContent = inApp ? (isIOS ? 'Safari로 열기' : '크롬으로 열기') : (isIOS ? '설치 방법' : '설치');
 
 iBtn.onclick = async () => {
   if(inApp){ escapeInApp(false); return; }
+  if(isIOS){ showHowto(); return; }
   if(deferred){
     deferred.prompt();
     const { outcome } = await deferred.userChoice;
@@ -1243,16 +1258,116 @@ function escapeInApp(auto){
   if(!auto) setTimeout(() => { if(!document.hidden) showHowto(); }, 1600);
 }
 
+/* ── 설치 가이드 그림 ── */
+const SV = (h, inner) =>
+  `<svg viewBox="0 0 220 ${h}" xmlns="http://www.w3.org/2000/svg" role="img">
+    <style>
+      .ph{fill:none;stroke:var(--dimmer);stroke-width:2}
+      .bar{fill:var(--rule)}
+      .tx{fill:var(--dim);font:600 11px sans-serif}
+      .tb{fill:var(--ink);font:800 11.5px sans-serif}
+      .ic{fill:none;stroke:var(--ink);stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+      .ring{fill:none;stroke:#e5352b;stroke-width:2.5}
+    </style>${inner}</svg>`;
+
+// 사파리 하단 바 + 공유 버튼 강조
+const PIC_SHARE = SV(120, `
+  <rect x="12" y="6" width="196" height="108" rx="12" class="ph"/>
+  <rect x="26" y="20" width="120" height="7" rx="3.5" class="bar"/>
+  <rect x="26" y="35" width="168" height="7" rx="3.5" class="bar"/>
+  <rect x="26" y="50" width="96" height="7" rx="3.5" class="bar"/>
+  <rect x="12" y="76" width="196" height="38" rx="0" fill="var(--soft)"/>
+  <line x1="12" y1="76" x2="208" y2="76" stroke="var(--rule)" stroke-width="1.5"/>
+  <text x="40" y="99" class="tx">‹</text><text x="70" y="99" class="tx">›</text>
+  <g transform="translate(110,88)">
+    <path class="ic" d="M0,-9 L0,5 M-5,-4 L0,-9 L5,-4"/>
+    <path class="ic" d="M-7,0 L-7,9 L7,9 L7,0"/>
+  </g>
+  <circle cx="110" cy="90" r="17" class="ring"/>
+  <text x="152" y="99" class="tx">⌸</text>`);
+
+// 공유 시트에서 홈 화면에 추가
+const PIC_ADD = SV(120, `
+  <rect x="12" y="6" width="196" height="108" rx="12" class="ph"/>
+  <rect x="26" y="20" width="80" height="7" rx="3.5" class="bar"/>
+  <rect x="26" y="40" width="168" height="16" rx="5" fill="var(--soft)"/>
+  <text x="34" y="51" class="tx">복사</text>
+  <rect x="26" y="62" width="168" height="24" rx="5" fill="var(--soft)"/>
+  <text x="34" y="78" class="tb">홈 화면에 추가</text>
+  <g transform="translate(178,74)">
+    <path class="ic" d="M-6,0 L6,0 M0,-6 L0,6"/>
+  </g>
+  <rect x="23" y="59" width="174" height="30" rx="7" class="ring"/>`);
+
+// 오른쪽 위 추가 버튼
+const PIC_CONFIRM = SV(120, `
+  <rect x="12" y="6" width="196" height="108" rx="12" class="ph"/>
+  <text x="26" y="26" class="tx">취소</text>
+  <text x="150" y="26" class="tb">추가</text>
+  <rect x="141" y="13" width="44" height="20" rx="9" class="ring"/>
+  <rect x="26" y="48" width="30" height="30" rx="8" fill="var(--c0)"/>
+  <rect x="66" y="53" width="90" height="8" rx="4" class="bar"/>
+  <rect x="66" y="67" width="120" height="7" rx="3.5" class="bar"/>`);
+
+// 안드로이드 브라우저 메뉴
+const PIC_MENU = SV(120, `
+  <rect x="12" y="6" width="196" height="108" rx="12" class="ph"/>
+  <circle cx="192" cy="18" r="1.8" fill="var(--ink)"/>
+  <circle cx="192" cy="24" r="1.8" fill="var(--ink)"/>
+  <circle cx="192" cy="30" r="1.8" fill="var(--ink)"/>
+  <circle cx="192" cy="24" r="14" class="ring"/>
+  <rect x="26" y="52" width="150" height="7" rx="3.5" class="bar"/>
+  <rect x="26" y="68" width="110" height="7" rx="3.5" class="bar"/>
+  <rect x="26" y="84" width="130" height="7" rx="3.5" class="bar"/>`);
+
+const PIC_INSTALL = SV(120, `
+  <rect x="12" y="6" width="196" height="108" rx="12" class="ph"/>
+  <rect x="26" y="20" width="168" height="20" rx="5" fill="var(--soft)"/>
+  <text x="34" y="34" class="tx">새 탭</text>
+  <rect x="26" y="46" width="168" height="26" rx="5" fill="var(--soft)"/>
+  <text x="34" y="63" class="tb">앱 설치</text>
+  <g transform="translate(178,59)">
+    <path class="ic" d="M0,-7 L0,4 M-4,0 L0,4 L4,0"/>
+    <path class="ic" d="M-7,7 L7,7"/>
+  </g>
+  <rect x="23" y="43" width="174" height="32" rx="7" class="ring"/>
+  <rect x="26" y="80" width="168" height="18" rx="5" fill="var(--soft)"/>`);
+
+function step(n, text, pic){
+  return `<div class="gstep">
+    <div class="gtext"><span class="gnum">${n}</span><p>${text}</p></div>
+    ${pic ? `<div class="gpic">${pic}</div>` : ''}
+  </div>`;
+}
+
 function showHowto(){
-  const steps = inApp
-    ? (isIOS
-        ? '① 오른쪽 아래 <b>메뉴</b> → <b>Safari로 열기</b>\n② 사파리 아래쪽 <b>공유 버튼</b>\n③ <b>홈 화면에 추가</b>'
-        : '① 오른쪽 아래 <b>메뉴</b>\n② <b>다른 브라우저로 열기</b> → <b>Chrome</b>\n③ 크롬에서 오른쪽 위 <b>설치</b> 버튼')
-    : (isIOS
-        ? '① 화면 아래쪽 <b>공유 버튼</b>\n② <b>홈 화면에 추가</b>\n③ 오른쪽 위 <b>추가</b>'
-        : '① 브라우저 메뉴 <b>⋮</b>\n② <b>앱 설치</b> 또는 <b>홈 화면에 추가</b>');
-  document.getElementById('howtoBody').innerHTML =
-    (inApp ? '지금 <b>카톡·네이버 같은 앱 안의 브라우저</b>로 열려 있어서\n설치가 안 돼요.\n\n' : '') + steps;
+  const note = document.getElementById('howtoNote');
+  const box  = document.getElementById('howtoBody');
+  let steps = '';
+
+  if(inApp){
+    note.hidden = false;
+    note.textContent = '지금 카톡·네이버 같은 앱 안의 브라우저로 열려 있어서 설치가 안 돼요.';
+    steps = isIOS
+      ? step(1, '오른쪽 아래 <b>메뉴</b>에서 <b>Safari로 열기</b>', PIC_MENU) +
+        step(2, '사파리 아래쪽 <b>공유 버튼</b> 누르기', PIC_SHARE) +
+        step(3, '<b>홈 화면에 추가</b> 선택', PIC_ADD)
+      : step(1, '오른쪽 아래 <b>메뉴</b> 누르기', PIC_MENU) +
+        step(2, '<b>다른 브라우저로 열기</b> → <b>Chrome</b>', '') +
+        step(3, '크롬에서 오른쪽 위 <b>설치</b> 버튼', PIC_INSTALL);
+  }else if(isIOS){
+    note.hidden = false;
+    note.textContent = '아이폰은 사파리에서만 설치할 수 있어요. 크롬으로 열었다면 사파리로 다시 열어주세요.';
+    steps = step(1, '화면 아래쪽 <b>공유 버튼</b> 누르기', PIC_SHARE) +
+            step(2, '목록을 내려서 <b>홈 화면에 추가</b> 선택', PIC_ADD) +
+            step(3, '오른쪽 위 <b>추가</b> 누르면 완료', PIC_CONFIRM);
+  }else{
+    note.hidden = true;
+    steps = step(1, '브라우저 오른쪽 위 <b>⋮ 메뉴</b> 누르기', PIC_MENU) +
+            step(2, '<b>앱 설치</b> 또는 <b>홈 화면에 추가</b> 선택', PIC_INSTALL) +
+            step(3, '홈 화면에 생긴 아이콘으로 열면 끝', '');
+  }
+  box.innerHTML = steps;
   openSheet('howto');
 }
 
