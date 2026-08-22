@@ -161,6 +161,11 @@ input[type=date]{color-scheme:light dark}
 .primary{width:100%;padding:16px;border:0;border-radius:12px;background:var(--ink);color:var(--paper);
   font-size:16px;font-weight:800;letter-spacing:-.03em;cursor:pointer;margin-top:28px}
 .primary:disabled{opacity:.45}
+.primary,.hbtn,.iconbtn,.fab{transition:transform .08s ease}
+.primary:active{transform:scale(.98)}
+.hbtn:active{transform:scale(.95)}
+.iconbtn:active{transform:scale(.9)}
+.fab:active{transform:scale(.93)}
 .picked{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
 .picked .p{position:relative}
 .picked img{width:70px;height:70px;object-fit:cover;border-radius:7px;border:1px solid var(--rule);display:block}
@@ -321,7 +326,7 @@ input[type=date]{color-scheme:light dark}
   <div class="fsrow">
     <button id="fsMinus">가−</button><span id="fsVal">100%</span><button id="fsPlus">가＋</button>
   </div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-bottom:0">v24</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-bottom:0">v25</p>
 </main>
 
 <button class="fab" id="fab" aria-label="새 안내 작성">+</button>
@@ -662,7 +667,7 @@ window.openDetail = id => {
 
 document.getElementById('delBtn').onclick = async () => {
   if(!current) return;
-  if(!await ask('안내 삭제', '이 안내를 삭제할까요? 되돌릴 수 없어요.', '삭제', true)) return;
+  if(!await ask('이 안내를 삭제할까요?', '삭제한 안내는 복구할 수 없어요.', '삭제', true)) return;
   try{ await deleteDoc(doc(db,'notices',current.id)); closeSheet('detail'); toast('삭제했어요'); }
   catch{ toast('삭제에 실패했어요'); }
 };
@@ -789,8 +794,12 @@ function toast(msg, ms = 2400){
 const modal = document.getElementById('modal');
 function dialog({ title='', body='', okText='확인', cancel=false, danger=false }){
   return new Promise(res => {
-    document.getElementById('mTitle').textContent = title;
-    document.getElementById('mBody').textContent = body;
+    const titleEl = document.getElementById('mTitle');
+    const bodyEl  = document.getElementById('mBody');
+    titleEl.textContent = title;
+    bodyEl.textContent = body;
+    bodyEl.style.display = body ? '' : 'none';
+    titleEl.style.marginBottom = body ? '' : '18px';
     const ok = document.getElementById('mOk'), no = document.getElementById('mNo');
     ok.textContent = okText;
     ok.classList.toggle('danger', danger);
@@ -1013,7 +1022,7 @@ function watchMessages(on){
       mbox.querySelectorAll('img').forEach((img, n) => img.onclick = () => openLightbox(srcs, n, '건의사진'));
     });
     document.querySelectorAll('#inboxBody .mdel').forEach(b => b.onclick = async () => {
-      if(!await ask('쪽지 삭제', '이 메시지를 삭제할까요?', '삭제', true)) return;
+      if(!await ask('이 메시지를 삭제할까요?', '', '삭제', true)) return;
       try{ await deleteDoc(doc(db,'messages',b.dataset.mid)); }catch{ toast('삭제 실패'); }
     });
   }, () => {});
@@ -1027,7 +1036,7 @@ document.getElementById('brand').onclick = () => {
   tapTimer = setTimeout(()=>taps=0, 1200);
   if(taps >= 5){
     taps = 0;
-    if(isAdmin){ ask('관리자', '로그아웃할까요?', '로그아웃').then(v => { if(v) signOut(auth); }); }
+    if(isAdmin){ ask('로그아웃할까요?', '', '로그아웃').then(v => { if(v) signOut(auth); }); }
     else openSheet('admin');
   }
 };
@@ -1087,10 +1096,8 @@ function drawCatEdit(){
     const n = +b.dataset.del;
     if(draft.length <= 1){ toast('분류는 최소 하나 필요해요'); return; }
     const used = items.filter(i => i.cat === draft[n].id).length;
-    const msg = used
-      ? `"${draft[n].name}" 분류에 안내 ${used}개가 있어요.\n삭제해도 안내는 남지만 "기타"로 표시됩니다.`
-      : `"${draft[n].name}" 분류를 삭제할까요?`;
-    ask('분류 삭제', msg, '삭제', true).then(v => {
+    const msg = used ? `이 분류의 안내 ${used}개는 사라지지 않고 '기타'로 표시돼요.` : '';
+    ask(`'${draft[n].name}' 분류를 삭제할까요?`, msg, '삭제', true).then(v => {
       if(!v) return;
       draft.splice(n,1); drawCatEdit();
     });
@@ -1221,8 +1228,7 @@ document.getElementById('saveBtn').onclick = async () => {
       toast('수정했어요');
     }else{
       await addDoc(COL, { ...payload, createdAt: serverTimestamp() });
-      toast('올렸어요');
-      pushNotice(payload);          // 새 공지만 알림 발송
+      pushNotice(payload);          // 결과 메시지는 발송까지 끝난 뒤 한 번만
     }
     closeSheet('write'); editId = null;
   }catch{ toast('저장에 실패했어요. 사진 수를 줄여보세요'); }
@@ -1291,10 +1297,10 @@ async function pushNotice(p){
     const raw = await res.text();
     let d = {};
     try{ d = JSON.parse(raw); }catch{}
-    if(d.ok) toast(`알림 전송 완료 — 기기 ${d.sent}대`, 6000);
-    else note('알림 발송 실패', 'HTTP ' + res.status + '\n' + raw.slice(0,200));
+    if(d.ok) toast(`공지를 올렸어요 · 알림 ${d.sent}대 전송`, 5000);
+    else note('공지는 올라갔어요', '알림 전송만 실패했어요.\nHTTP ' + res.status + ' · ' + raw.slice(0,150));
   }catch(err){
-    note('알림 서버 연결 실패', String(err && err.message || err));
+    note('공지는 올라갔어요', '알림 서버에 연결하지 못해 알림만 못 갔어요.');
   }
 }
 
