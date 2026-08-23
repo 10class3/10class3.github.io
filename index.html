@@ -216,16 +216,16 @@ html.booting main,
 html.booting .fab{visibility:hidden}
 #boot{position:fixed;inset:0;z-index:200;background:#1e2430;
   display:flex;align-items:center;justify-content:center;
-  transition:opacity .35s ease}
+  transition:opacity .22s ease}
 #boot.off{opacity:0;pointer-events:none}
 
 /* 아이콘과 동일한 비율의 3줄이 왼쪽에서 오른쪽으로 그어짐 */
-.bootbars{width:230px;display:flex;flex-direction:column;gap:16px}
-.bootbars i{height:24px;border-radius:12px;width:0;display:block;
-  animation:draw .62s cubic-bezier(.22,.9,.3,1) forwards}
-.bootbars i:nth-child(1){background:#ffe95c;--w:100%;animation-delay:.04s}
-.bootbars i:nth-child(2){background:#c9b8ff;--w:77%; animation-delay:.19s}
-.bootbars i:nth-child(3){background:#a3efc9;--w:58%; animation-delay:.34s}
+.bootbars{width:12vw;max-width:96px;display:flex;flex-direction:column;gap:3.1vw}
+.bootbars i{height:5.3vw;max-height:42px;border-radius:99px;width:0;display:block;
+  animation:draw .26s cubic-bezier(.25,.9,.35,1) forwards}
+.bootbars i:nth-child(1){background:#ffe95c;--w:100%;animation-delay:0s}
+.bootbars i:nth-child(2){background:#c9b8ff;--w:78%; animation-delay:.07s}
+.bootbars i:nth-child(3){background:#a3efc9;--w:57%; animation-delay:.14s}
 @keyframes draw{from{width:0}to{width:var(--w)}}
 @media (prefers-reduced-motion:reduce){
   .bootbars i{animation:none;width:var(--w)}
@@ -524,7 +524,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v36</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v37</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1518,8 +1518,8 @@ function bootDone(){
   setTimeout(() => {                       // 3줄이 다 그어질 때까지 기다림
     root.classList.remove('booting');
     root.style.background = theme === 'dark' ? '#101216' : '#ffffff';
-    if(b){ b.classList.add('off'); setTimeout(() => b.remove(), 400); }
-  }, 1120);
+    if(b){ b.classList.add('off'); setTimeout(() => b.remove(), 260); }
+  }, 480);
 }
 setTimeout(bootDone, 2500);   // 연결이 늦어도 화면이 막히지 않게
 
