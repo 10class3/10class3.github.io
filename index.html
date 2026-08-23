@@ -436,6 +436,7 @@ html.booting .fab{visibility:hidden}
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('detail')">← 목록</button>
     <div class="topacts">
+      <button id="calBtn">캘린더</button>
       <button id="shareBtn">공유</button>
       <button id="editBtn" hidden>수정</button>
       <button id="delBtn" class="delbtn" hidden>삭제</button>
@@ -555,7 +556,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v43</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v44</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -876,6 +877,7 @@ window.openDetail = id => {
   document.querySelectorAll('#detailBody .dtl-imgs img').forEach((img, n) =>
     img.onclick = () => openLightbox(i.images, n, i.title));
   bindChecks(i);
+  document.getElementById('calBtn').hidden = !(i.date || (i.sessions && i.sessions.length));
   document.getElementById('delBtn').hidden = !isAdmin || !!i.readonly;
   document.getElementById('editBtn').hidden = !isAdmin || !!i.readonly;
   openSheet('detail');
@@ -920,6 +922,58 @@ document.getElementById('delBtn').onclick = async () => {
   if(!await ask('이 안내를 삭제할까요?', '삭제한 안내는 복구할 수 없어요.', '삭제', true)) return;
   try{ await deleteDoc(doc(db,'notices',current.id)); closeSheet('detail'); toast('삭제했어요'); }
   catch{ toast('삭제에 실패했어요'); }
+};
+
+/* ═══ 캘린더 내보내기 (.ics) ═══ */
+document.getElementById('calBtn').onclick = () => {
+  if(!current) return;
+  const i = current;
+  const pad = n => String(n).padStart(2,'0');
+  const stamp = new Date().toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
+
+  // 하루 종일 일정: 시작일 다음 날을 종료일로 지정
+  const plusDay = s => {
+    const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate()+1);
+    return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}`;
+  };
+  const fold = s => String(s).replace(/[\\;,]/g, m => '\\' + m).replace(/\n/g, '\\n');
+
+  const list = (i.sessions && i.sessions.length)
+    ? i.sessions.filter(s => s.date).map((s,n) => ({ date:s.date, label:` (${s.label || (n+1)+'차시'})` }))
+    : (i.date ? [{ date:i.date, label:'' }] : []);
+  if(!list.length){ toast('날짜가 없는 안내예요'); return; }
+
+  const body = list.map((s,n) => [
+    'BEGIN:VEVENT',
+    `UID:${i.id}-${n}@class3`,
+    `DTSTAMP:${stamp}`,
+    `DTSTART;VALUE=DATE:${s.date.replace(/-/g,'')}`,
+    `DTEND;VALUE=DATE:${plusDay(s.date)}`,
+    `SUMMARY:[${fold(catName(i.cat))}] ${fold(i.title)}${fold(s.label)}`,
+    i.body ? `DESCRIPTION:${fold(i.body)}` : '',
+    'BEGIN:VALARM',
+    'TRIGGER:-P1D',                       // 하루 전 알림
+    'ACTION:DISPLAY',
+    `DESCRIPTION:${fold(i.title)}`,
+    'END:VALARM',
+    'END:VEVENT'
+  ].filter(Boolean).join('\r\n')).join('\r\n');
+
+  const ics = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//3반 알리미//KO','CALSCALE:GREGORIAN',
+               body, 'END:VCALENDAR'].join('\r\n');
+
+  try{
+    const blob = new Blob([ics], { type:'text/calendar;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${String(i.title).replace(/[\\/:*?"<>|\s]+/g,'_').slice(0,20)}.ics`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+    toast(list.length > 1 ? `일정 ${list.length}개를 내보냈어요` : '캘린더 앱에서 열어주세요');
+  }catch{
+    note('내보내기 실패', '이 브라우저에서는 캘린더 내보내기가 지원되지 않아요.');
+  }
 };
 
 document.getElementById('shareBtn').onclick = async () => {
