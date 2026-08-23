@@ -15,15 +15,6 @@
   d.dataset.theme = t;
   d.style.background = (t === 'dark') ? '#101216' : '#ffffff';
   d.style.colorScheme = t;
-
-  // 앱을 새로 열었을 때만 시작 애니메이션 (새로고침은 제외)
-  try{
-    if(!sessionStorage.getItem('seen')){
-      sessionStorage.setItem('seen','1');
-      d.classList.add('booting');
-      d.style.background = '#1e2430';
-    }
-  }catch(e){}
 })();
 </script>
 
@@ -210,34 +201,7 @@ input[type=date]{color-scheme:light dark}
 .crow .del{background:none;border:0;color:var(--dim);font-size:19px;cursor:pointer;padding:4px 2px;flex-shrink:0}
 
 /* 앱 시작 화면 — 스플래시와 같은 색에서 형광펜이 그어짐 */
-html:not(.booting) #boot{display:none}
-html.booting header,
-html.booting main,
-html.booting .fab{visibility:hidden}
-#boot{position:fixed;inset:0;z-index:200;background:#1e2430;
-  display:flex;align-items:center;justify-content:center;
-  transition:opacity .22s ease}
-#boot.off{opacity:0;pointer-events:none}
 
-/* 스플래시 아이콘의 막대 위치에서 시작해 길게 뻗어나감
-   (아이콘 = 48vw 정사각형, 내부 여백 22% / 위 30% / 굵기 8.5% / 간격 5.5%) */
-.bootbars{position:absolute;
-  left:calc(50% - 13.44vw);            /* 아이콘 왼쪽 여백까지 반영한 실제 막대 시작점 */
-  top:calc(50% - 9.6vw);
-  display:flex;flex-direction:column;gap:2.64vw}
-.bootbars i{height:4.08vw;border-radius:99px;width:0;display:block;
-  animation:draw .72s cubic-bezier(.3,.85,.35,1) forwards}
-.bootbars i:nth-child(1){background:#ffe95c;--w:11.83vw;--x:55vw;  animation-delay:0s}
-.bootbars i:nth-child(2){background:#c9b8ff;--w:9.14vw; --x:42.5vw;animation-delay:.06s}
-.bootbars i:nth-child(3){background:#a3efc9;--w:6.99vw; --x:32.5vw;animation-delay:.12s}
-@keyframes draw{
-  0%  {width:0}
-  38% {width:var(--w)}                  /* 여기서 스플래시 로고와 정확히 겹침 */
-  100%{width:var(--x)}                  /* 이어서 길게 뻗어나감 */
-}
-@media (prefers-reduced-motion:reduce){
-  .bootbars i{animation:none;width:var(--w)}
-}
 
 /* 주간 보기 */
 .weekbar{display:flex;gap:5px;padding:14px 0 4px}
@@ -380,8 +344,6 @@ html.booting .fab{visibility:hidden}
 </style>
 </head>
 <body>
-
-<div id="boot"><div class="bootbars"><i></i><i></i><i></i></div></div>
 
 <header>
   <div class="hrow">
@@ -532,7 +494,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v39</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v40</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1055,7 +1017,7 @@ onSnapshot(query(COL, orderBy('createdAt','desc'), limit(150)), snap => {
              body:v.body||'', images:v.images||[],
              createdAt:v.createdAt?.toMillis?.()||null, updatedAt:v.updatedAt?.toMillis?.()||null };
   });
-  render(); maybeNotify(); bootDone();
+  render(); maybeNotify();
 }, () => {
   document.getElementById('list').innerHTML =
     '<div class="empty"><b>연결에 실패했어요</b>Firebase 설정을 확인해 주세요</div>';
@@ -1514,22 +1476,6 @@ document.getElementById('saveBtn').onclick = async () => {
   }catch{ toast('저장에 실패했어요. 사진 수를 줄여보세요'); }
   btn.disabled = false; btn.textContent = label;
 };
-
-/* ═══ 시작 화면 종료 ═══ */
-let booted = false;
-function bootDone(){
-  if(booted) return;
-  booted = true;
-  const root = document.documentElement;
-  const b = document.getElementById('boot');
-  if(!root.classList.contains('booting')){ if(b) b.remove(); return; }
-  setTimeout(() => {                       // 3줄이 다 그어질 때까지 기다림
-    root.classList.remove('booting');
-    root.style.background = theme === 'dark' ? '#101216' : '#ffffff';
-    if(b){ b.classList.add('off'); setTimeout(() => b.remove(), 260); }
-  }, 760);
-}
-setTimeout(bootDone, 2500);   // 연결이 늦어도 화면이 막히지 않게
 
 /* ═══ 검색 · 글자 크기 · 당겨서 새로고침 ═══ */
 const searchRow = document.getElementById('searchRow');
