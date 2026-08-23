@@ -487,7 +487,7 @@ html.booting .fab{visibility:hidden}
     <button class="xbtn" onclick="closeSheet('settings')">← 닫기</button>
     <span class="stitle">분류 관리</span>
   </div>
-  <p class="hint" style="margin:0 0 10px">이름을 고치거나 분류를 추가할 수 있어요. 색은 순서대로 자동 배정됩니다.</p>
+  <p class="hint" style="margin:0 0 10px">이름을 고치거나 분류를 추가할 수 있어요. 색은 순서대로 자동 배정됩니다.<br>학사일정은 학교 데이터와 함께 쓰이는 분류라 여기서 바꿀 수 없어요.</p>
   <div id="catEdit"></div>
   <button class="filebtn" id="catAdd" style="margin-top:14px">＋ 분류 추가</button>
   <button class="primary" id="catSave">저장</button>
@@ -556,7 +556,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v49</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v50</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -709,7 +709,8 @@ function renderTabs(){
   box.innerHTML =
     `<button class="tab" role="tab" data-cat="all" aria-selected="${cat==='all'}">전체<span class="n" data-n="all"></span></button>` +
     cats.map(c => `<button class="tab" role="tab" data-cat="${esc(c.id)}" aria-selected="${cat===c.id}">${esc(c.name)}<span class="n" data-n="${esc(c.id)}"></span></button>`).join('') +
-    (schedule.length ? `<button class="tab" role="tab" data-cat="${SCH}" aria-selected="${cat===SCH}">학사일정<span class="n" data-n="${SCH}"></span></button>` : '');
+    ((schedule.length || items.some(i => i.cat === SCH))
+      ? `<button class="tab" role="tab" data-cat="${SCH}" aria-selected="${cat===SCH}">학사일정<span class="n" data-n="${SCH}"></span></button>` : '');
   box.querySelectorAll('.tab').forEach(t => t.onclick = () => {
     cat = t.dataset.cat;
     box.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x===t?'true':'false'));
@@ -1178,7 +1179,7 @@ onSnapshot(CFG, snap => {
   const list = snap.exists() ? snap.data().list : null;
   if(Array.isArray(list) && list.length)
     cats = list.filter(c => c && c.id).map(c => ({ id:String(c.id), name:c.name || String(c.id) }));
-  if(catFound(wCat) < 0) wCat = cats[0].id;
+  if(wCat !== SCH && catFound(wCat) < 0) wCat = cats[0].id;
   renderTabs(); render(); drawCatPick();
 }, () => {});
 
@@ -1486,7 +1487,8 @@ document.getElementById('catSave').onclick = async () => {
 /* ═══ 작성 · 수정 ═══ */
 function drawCatPick(){
   document.getElementById('catpick').innerHTML = cats.map(c =>
-    `<button data-c="${esc(c.id)}" aria-pressed="${wCat===c.id}">${esc(c.name)}</button>`).join('');
+    `<button data-c="${esc(c.id)}" aria-pressed="${wCat===c.id}">${esc(c.name)}</button>`).join('') +
+    `<button data-c="${SCH}" aria-pressed="${wCat===SCH}">학사일정</button>`;
   document.querySelectorAll('#catpick button').forEach(b => b.onclick = () => {
     wCat = b.dataset.c;
     document.querySelectorAll('#catpick button').forEach(x =>
@@ -1523,7 +1525,7 @@ function openWrite(item){
   document.getElementById('draftHint').hidden = !!item;
   document.getElementById('writeTitle').textContent = item ? '안내 수정' : '새 안내';
   document.getElementById('saveBtn').textContent = item ? '수정 완료' : '올리기';
-  wCat = item ? (catFound(item.cat) >= 0 ? item.cat : cats[0].id) : cats[0].id;
+  wCat = item ? ((item.cat === SCH || catFound(item.cat) >= 0) ? item.cat : cats[0].id) : cats[0].id;
   drawCatPick();
   document.getElementById('wTitle').value = item ? item.title : '';
   document.getElementById('wBody').value  = item ? item.body  : '';
@@ -1575,7 +1577,7 @@ async function restoreDraft(){
   if(!await ask('작성 중이던 글이 있어요', `"${label}" 이어서 쓸까요?`, '이어쓰기')){
     localStorage.removeItem('draft'); return false;
   }
-  wCat = catFound(d.cat) >= 0 ? d.cat : cats[0].id;
+  wCat = (d.cat === SCH || catFound(d.cat) >= 0) ? d.cat : cats[0].id;
   wPin = !!d.pin;
   pinBtn.setAttribute('aria-pressed', wPin ? 'true' : 'false');
   drawCatPick();
