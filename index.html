@@ -219,14 +219,14 @@ html.booting main,
 html.booting .fab{visibility:hidden}
 #boot{position:fixed;inset:0;z-index:200;background:#1e2430;
   display:flex;align-items:center;justify-content:center;
-  transition:opacity .18s ease}
+  transition:opacity .14s ease}
 #boot.off{opacity:0;pointer-events:none}
 .bootbars{position:absolute;
   left:calc(50% - 13.44vw);
   top:calc(50% - 9.6vw);
   display:flex;flex-direction:column;gap:2.64vw}
 .bootbars i{height:4.08vw;border-radius:99px;width:0;display:block;
-  animation:draw .34s cubic-bezier(.25,.9,.3,1) forwards}
+  animation:draw .26s cubic-bezier(.25,.9,.3,1) forwards}
 .bootbars i:nth-child(1){background:#ffe95c;--w:11.83vw;--x:42vw;  animation-delay:0s}
 .bootbars i:nth-child(2){background:#c9b8ff;--w:9.14vw; --x:32.5vw;animation-delay:.04s}
 .bootbars i:nth-child(3){background:#a3efc9;--w:6.99vw; --x:25vw;  animation-delay:.08s}
@@ -556,7 +556,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v47</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v49</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1562,7 +1562,7 @@ function saveDraft(){
       localStorage.removeItem('draft'); return;
     }
     try{ localStorage.setItem('draft', JSON.stringify(d)); }catch{}
-  }, 400);
+  }, 150);
 }
 document.getElementById('wTitle').oninput = saveDraft;
 document.getElementById('wBody').oninput  = saveDraft;
@@ -1719,10 +1719,11 @@ function bootDone(){
   setTimeout(() => {
     root.classList.remove('booting');
     root.style.background = theme === 'dark' ? '#101216' : '#ffffff';
-    if(b){ b.classList.add('off'); setTimeout(() => b.remove(), 220); }
+    if(b){ b.classList.add('off'); setTimeout(() => b.remove(), 160); }
   }, 400);
 }
-setTimeout(bootDone, 2500);
+addEventListener('DOMContentLoaded', bootDone);   // 데이터를 기다리지 않고 바로 진행
+setTimeout(bootDone, 1200);
 
 /* ═══ 검색 · 글자 크기 · 당겨서 새로고침 ═══ */
 const searchRow = document.getElementById('searchRow');
