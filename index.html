@@ -219,17 +219,17 @@ html.booting main,
 html.booting .fab{visibility:hidden}
 #boot{position:fixed;inset:0;z-index:200;background:#1e2430;
   display:flex;align-items:center;justify-content:center;
-  transition:opacity .22s ease}
+  transition:opacity .18s ease}
 #boot.off{opacity:0;pointer-events:none}
 .bootbars{position:absolute;
   left:calc(50% - 13.44vw);
   top:calc(50% - 9.6vw);
   display:flex;flex-direction:column;gap:2.64vw}
 .bootbars i{height:4.08vw;border-radius:99px;width:0;display:block;
-  animation:draw .72s cubic-bezier(.3,.85,.35,1) forwards}
+  animation:draw .34s cubic-bezier(.25,.9,.3,1) forwards}
 .bootbars i:nth-child(1){background:#ffe95c;--w:11.83vw;--x:42vw;  animation-delay:0s}
-.bootbars i:nth-child(2){background:#c9b8ff;--w:9.14vw; --x:32.5vw;animation-delay:.06s}
-.bootbars i:nth-child(3){background:#a3efc9;--w:6.99vw; --x:25vw;  animation-delay:.12s}
+.bootbars i:nth-child(2){background:#c9b8ff;--w:9.14vw; --x:32.5vw;animation-delay:.04s}
+.bootbars i:nth-child(3){background:#a3efc9;--w:6.99vw; --x:25vw;  animation-delay:.08s}
 @keyframes draw{
   0%  {width:0}
   38% {width:var(--w)}     /* 스플래시 로고와 겹치는 순간 */
@@ -556,7 +556,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v45</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v47</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -962,33 +962,62 @@ document.getElementById('calBtn').onclick = () => {
   const ics = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//3반 알리미//KO','CALSCALE:GREGORIAN',
                body, 'END:VCALENDAR'].join('\r\n');
 
-  // 일정이 하나뿐이고 아이폰이 아니면 → 구글 캘린더에서 바로 열기
+  const fileName = `${String(i.title).replace(/[\\/:*?"<>|\s]+/g,'_').slice(0,20)}.ics`;
+
+  // 다운로드 (마지막 수단)
+  const downloadFile = () => {
+    try{
+      const blob = new Blob([ics], { type:'text/calendar;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fileName;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      note('캘린더 파일을 저장했어요', '알림창이나 다운로드 폴더에서 파일을 누르면\n캘린더에 추가됩니다.');
+    }catch{
+      note('내보내기 실패', '이 브라우저에서는 캘린더 내보내기가 지원되지 않아요.');
+    }
+  };
+
+  // 기기의 캘린더 앱으로 곧바로 넘기기
+  const openInCalendar = async () => {
+    try{
+      const file = new File([ics], fileName, { type:'text/calendar' });
+      if(navigator.canShare && navigator.canShare({ files:[file] })){
+        await navigator.share({ files:[file], title: i.title });
+        return;
+      }
+    }catch(e){
+      if(e && e.name === 'AbortError') return;   // 사용자가 취소함
+    }
+    downloadFile();
+  };
+
+  const saveFile = openInCalendar;
+
+  // 일정 1개 + 안드로이드 → 어떤 캘린더를 쓸지 선택
   if(list.length === 1 && !isIOS){
-    const s = list[0];
-    const g = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
-      + `&text=${encodeURIComponent(`[${catName(i.cat)}] ${i.title}${s.label}`)}`
-      + `&dates=${s.date.replace(/-/g,'')}/${plusDay(s.date)}`
-      + (i.body ? `&details=${encodeURIComponent(i.body.slice(0,300))}` : '');
-    window.open(g, '_blank', 'noopener');
+    dialog({
+      title: '캘린더에 추가',
+      body: '어느 캘린더에 추가할까요?',
+      okText: '구글 캘린더', cancelText: '기본 캘린더', cancel: true
+    }).then(useGoogle => {
+      if(useGoogle){
+        const s = list[0];
+        const g = 'https://calendar.google.com/calendar/render?action=TEMPLATE'
+          + `&text=${encodeURIComponent(`[${catName(i.cat)}] ${i.title}${s.label}`)}`
+          + `&dates=${s.date.replace(/-/g,'')}/${plusDay(s.date)}`
+          + (i.body ? `&details=${encodeURIComponent(i.body.slice(0,300))}` : '');
+        window.open(g, '_blank', 'noopener');
+      }else saveFile();
+    });
     return;
   }
 
-  // 차시가 여러 개거나 아이폰 → 파일로 내보내기
-  try{
-    const blob = new Blob([ics], { type:'text/calendar;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${String(i.title).replace(/[\\/:*?"<>|\s]+/g,'_').slice(0,20)}.ics`;
-    document.body.appendChild(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(url), 4000);
-    note('캘린더 파일을 저장했어요',
-      list.length > 1 ? `일정 ${list.length}개가 담겼어요.\n다운로드한 파일을 누르면 캘린더에 추가됩니다.`
-                      : '다운로드한 파일을 누르면 캘린더에 추가됩니다.');
-  }catch{
-    note('내보내기 실패', '이 브라우저에서는 캘린더 내보내기가 지원되지 않아요.');
-  }
+  saveFile();
 };
+
+
 
 document.getElementById('shareBtn').onclick = async () => {
   if(!current) return;
@@ -1117,7 +1146,7 @@ function toast(msg, ms = 2400){
 
 /* ═══ 앱 스타일 대화창 (alert/confirm 대체) ═══ */
 const modal = document.getElementById('modal');
-function dialog({ title='', body='', okText='확인', cancel=false, danger=false }){
+function dialog({ title='', body='', okText='확인', cancelText='취소', cancel=false, danger=false }){
   return new Promise(res => {
     const titleEl = document.getElementById('mTitle');
     const bodyEl  = document.getElementById('mBody');
@@ -1127,6 +1156,7 @@ function dialog({ title='', body='', okText='확인', cancel=false, danger=false
     titleEl.style.marginBottom = body ? '' : '18px';
     const ok = document.getElementById('mOk'), no = document.getElementById('mNo');
     ok.textContent = okText;
+    no.textContent = cancelText;
     ok.classList.toggle('danger', danger);
     no.hidden = !cancel;
     modal.classList.add('on');
@@ -1689,8 +1719,8 @@ function bootDone(){
   setTimeout(() => {
     root.classList.remove('booting');
     root.style.background = theme === 'dark' ? '#101216' : '#ffffff';
-    if(b){ b.classList.add('off'); setTimeout(() => b.remove(), 260); }
-  }, 760);
+    if(b){ b.classList.add('off'); setTimeout(() => b.remove(), 220); }
+  }, 400);
 }
 setTimeout(bootDone, 2500);
 
