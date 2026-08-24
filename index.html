@@ -610,7 +610,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v64</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v65</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1197,7 +1197,9 @@ function hideLightbox(){
   if(!document.querySelector('.sheet.on')) document.body.style.overflow='';
 }
 function closeLightbox(){
-  if(lb.classList.contains('on')) history.back();
+  if(!lb.classList.contains('on')) return;
+  if(layers.length) history.back();
+  else hideLightbox();
 }
 document.getElementById('lbPrev').onclick = e => { e.stopPropagation(); lbMove(-1); };
 document.getElementById('lbNext').onclick = e => { e.stopPropagation(); lbMove(1); };
@@ -1241,6 +1243,22 @@ addEventListener('popstate', () => {
     layers.pop()();
     return;
   }
+
+  // 기록과 화면이 어긋난 경우에도 열려 있는 화면을 먼저 닫는다
+  if(lb.classList.contains('on')){
+    history.pushState({ root:1 }, '');
+    hideLightbox();
+    return;
+  }
+  const opens = [...document.querySelectorAll('.sheet.on')];
+  if(opens.length){
+    history.pushState({ root:1 }, '');
+    const top = opens.reduce((a,b) =>
+      (+b.style.zIndex || 60) >= (+a.style.zIndex || 60) ? b : a);
+    hideSheet(top.id);
+    return;
+  }
+
   if(!exitArmed){                        // 목록 화면에서 실수로 나가는 것 방지
     exitArmed = true;
     history.pushState({ root:1 }, '');
@@ -1269,8 +1287,10 @@ window.openSheet = id => {
   pushLayer(() => hideSheet(id));
 };
 window.closeSheet = id => {
-  if(!document.getElementById(id).classList.contains('on')) return;
-  history.back();
+  const el = document.getElementById(id);
+  if(!el.classList.contains('on')) return;
+  if(layers.length) history.back();      // 정상 경로
+  else hideSheet(id);                    // 기록이 비어 있으면 곧바로 닫기
 };
 
 let toastTimer;
