@@ -239,12 +239,23 @@ html.booting .fab{visibility:hidden}
   .bootbars i{animation:none;width:var(--w)}
 }
 
-/* 급식 카드 */
-.mealcard{display:flex;align-items:center;gap:13px;margin:16px 0 2px;padding:14px 16px;
-  border:1.5px solid var(--rule);border-radius:13px;cursor:pointer;background:var(--soft)}
-.mealcard .ml{font-size:11px;font-weight:800;letter-spacing:.04em;color:var(--dim);flex-shrink:0}
-.mealcard .mm{font-size:14px;font-weight:700;letter-spacing:-.03em;line-height:1.45;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1}
+/* 상단 고정 카드 묶음 (급식·시간표·명언) */
+.topcards{border:1.5px solid var(--rule);border-radius:14px;overflow:hidden;margin:16px 0 4px}
+.tcard{display:flex;align-items:center;gap:12px;padding:13px 15px;cursor:pointer;background:var(--soft)}
+.tcard + .tcard{border-top:1px solid var(--rule)}
+.tcard .tl{font-size:11px;font-weight:800;letter-spacing:.03em;color:var(--dim);flex-shrink:0;width:58px}
+.tcard .tv{font-size:14px;font-weight:700;letter-spacing:-.03em;flex:1;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tcard .tq{font-weight:600;color:var(--ink);white-space:normal;line-height:1.45;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+
+/* 분류별 묶음 헤더 */
+.grouphead{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:20px 0 10px;cursor:pointer;border-bottom:1.5px solid var(--ink)}
+.grouphead b{font-size:14px;font-weight:900;letter-spacing:-.03em}
+.grouphead b mark{background:linear-gradient(transparent var(--markpos),var(--mk) var(--markpos))}
+.grouphead .gc{font-size:12.5px;font-weight:800;color:var(--dim)}
+
 .mealday{padding:18px 0;border-bottom:1px solid var(--rule)}
 .mealday b{display:block;font-size:13.5px;font-weight:800;letter-spacing:-.03em;margin-bottom:8px}
 .mealday.today b{color:var(--urgent)}
@@ -418,7 +429,7 @@ html.booting .fab{visibility:hidden}
 </header>
 
 <main>
-  <div id="mealBox"></div>
+  <div id="topCards"></div>
   <div id="weekBox" hidden></div>
   <div id="urgentBox"></div>
   <div id="list">
@@ -541,6 +552,29 @@ html.booting .fab{visibility:hidden}
   <div id="mealBody"></div>
 </section>
 
+<section class="sheet" id="timetable">
+  <div class="sheettop">
+    <button class="xbtn" onclick="closeSheet('timetable')">← 닫기</button>
+    <span class="stitle">이번 주 시간표</span>
+  </div>
+  <div id="ttBody"></div>
+</section>
+
+<section class="sheet" id="quote">
+  <div class="sheettop">
+    <button class="xbtn" onclick="closeSheet('quote')">← 닫기</button>
+    <span class="stitle">오늘의 명언</span>
+  </div>
+  <div id="quoteBody"></div>
+  <div id="quoteEdit" hidden>
+    <label class="f" for="qText">명언</label>
+    <textarea id="qText" maxlength="200" style="min-height:100px" placeholder="오늘 반 친구들에게 남기고 싶은 한마디"></textarea>
+    <label class="f" for="qBy">출처 (선택)</label>
+    <input type="text" id="qBy" maxlength="30" placeholder="예) 아인슈타인">
+    <button class="primary" id="qSave">등록</button>
+  </div>
+</section>
+
 <section class="sheet" id="menu">
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('menu')">← 닫기</button>
@@ -556,7 +590,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v50</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v51</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -657,7 +691,11 @@ const catColor = id => id === SCH ? '#9fb4d4'
 
 let items = [], cat = 'all', isAdmin = false, current = null, showPast = false, searchQ = '';
 let weekOn = false, weekStart = null, weekPick = '', readMap = {}, wPin = false;
-let schedule = [], meals = [];
+const foldSet = new Set();
+let schedule = [], meals = [], timetable = [], quote = null;
+const MAIN_UID = 'zWlG3sYcv8OayfwsoYKYcF8VHz42';   // 총괄 관리자 (Authentication의 사용자 UID)
+let myUid = null, isMain = false;
+const canEdit = i => isAdmin && !i.readonly && (isMain || (i.author && i.author === myUid));
 
 // 기기마다 고유 ID — 같은 사람이 여러 번 봐도 1명으로 집계
 let devId = localStorage.getItem('devId');
@@ -749,6 +787,36 @@ function render(){
       : '<div class="empty"><b>아직 올라온 안내가 없어요</b>새 안내가 등록되면 여기에 표시됩니다</div>';
     return;
   }
+  // 전체 탭에서는 분류별로 묶어서 보여줌
+  if(cat === 'all' && !q && !weekPick){
+    const order = [...cats.map(c => c.id), SCH];
+    const groups = order
+      .map(id => ({ id, name: catName(id), list: live.filter(e => e.item.cat === id) }))
+      .filter(g => g.list.length);
+    const etc = live.filter(e => !order.includes(e.item.cat));
+    if(etc.length) groups.push({ id:'', name:'기타', list: etc });
+
+    box.innerHTML = groups.map(g => `
+      <div class="grouphead" data-g="${esc(g.id)}">
+        <b><mark style="--mk:${catColor(g.id)}">${esc(g.name)}</mark></b>
+        <span class="gc">${g.list.length}건 ${foldSet.has(g.id) ? '▼' : '▲'}</span>
+      </div>
+      ${foldSet.has(g.id) ? '' : g.list.map(e => rowHTML(e,false)).join('')}`).join('')
+      + (past.length ? `<button class="pastToggle" id="pastToggle">${
+          showPast ? '지난 안내 접기 ▲' : `지난 안내 ${past.length}개 보기 ▼`}</button>` +
+          (showPast ? past.map(e => rowHTML(e,true)).join('') : '') : '');
+
+    box.querySelectorAll('.grouphead').forEach(g => g.onclick = () => {
+      const id = g.dataset.g;
+      foldSet.has(id) ? foldSet.delete(id) : foldSet.add(id);
+      render();
+    });
+    const pt0 = document.getElementById('pastToggle');
+    if(pt0) pt0.onclick = () => { showPast = !showPast; render(); };
+    box.querySelectorAll('.row').forEach(r => r.onclick = () => openDetail(r.dataset.id));
+    return;
+  }
+
   const openPast = showPast || !!q;
   box.innerHTML = live.map(e => rowHTML(e,false)).join('') +
     (past.length
@@ -835,7 +903,7 @@ function rowHTML(e, isPast){
     <div>
       <h2 class="rtitle">${i.pin?'<span class="pin">고정</span>':''}${e.sess?`<span class="chip">${esc(e.sess)}</span>`:''}<mark style="--mk:${catColor(i.cat)}">${esc(i.title)}</mark></h2>
       <div class="rmeta"><span class="cat">${esc(catName(i.cat))}</span><span>·</span><span>${korDate(e.date)}</span>${
-        isAdmin && readMap[i.id] ? `<span>·</span><span>${readMap[i.id]}명 확인</span>` : ''}</div>
+        isMain && readMap[i.id] ? `<span>·</span><span>${readMap[i.id]}명 확인</span>` : ''}</div>
       ${i.body?`<p class="rprev">${esc(i.body)}</p>`:''}
       ${thumbs?`<div class="thumbs">${thumbs}</div>`:''}
     </div>
@@ -873,14 +941,14 @@ window.openDetail = id => {
     ${sched}
     ${bodyHTML(i)}
     ${imgs?`<div class="dtl-imgs">${imgs}<p class="imgcap">사진을 누르면 크게 볼 수 있어요</p></div>`:''}
-    <div class="dtl-foot"><span>${isAdmin && readMap[i.id] ? readMap[i.id]+"명 확인" : "3반 알리미"}</span><span>${i.updatedAt?'수정됨 · ':''}${i.createdAt?new Date(i.createdAt).toLocaleDateString('ko-KR')+' 등록':''}</span></div>`;
+    <div class="dtl-foot"><span>${isMain && readMap[i.id] ? readMap[i.id]+"명 확인" : (i.authorName ? esc(i.authorName) : "3반 알리미")}</span><span>${i.updatedAt?'수정됨 · ':''}${i.createdAt?new Date(i.createdAt).toLocaleDateString('ko-KR')+' 등록':''}</span></div>`;
 
   document.querySelectorAll('#detailBody .dtl-imgs img').forEach((img, n) =>
     img.onclick = () => openLightbox(i.images, n, i.title));
   bindChecks(i);
   document.getElementById('calBtn').hidden = !(i.date || (i.sessions && i.sessions.length));
-  document.getElementById('delBtn').hidden = !isAdmin || !!i.readonly;
-  document.getElementById('editBtn').hidden = !isAdmin || !!i.readonly;
+  document.getElementById('delBtn').hidden = !canEdit(i);
+  document.getElementById('editBtn').hidden = !canEdit(i);
   openSheet('detail');
 };
 
@@ -1186,7 +1254,7 @@ onSnapshot(CFG, snap => {
 onSnapshot(query(COL, orderBy('createdAt','desc'), limit(150)), snap => {
   items = snap.docs.map(d => {
     const v = d.data();
-    return { id:d.id, cat:v.cat||'', title:v.title||'', date:v.date||'', pin: !!v.pin,
+    return { id:d.id, cat:v.cat||'', title:v.title||'', date:v.date||'', pin: !!v.pin, author:v.author||'', authorName:v.authorName||'',
              sessions: Array.isArray(v.sessions) ? v.sessions : [],
              body:v.body||'', images:v.images||[],
              createdAt:v.createdAt?.toMillis?.()||null, updatedAt:v.updatedAt?.toMillis?.()||null };
@@ -1406,12 +1474,15 @@ document.getElementById('brand').onclick = () => {
 
 onAuthStateChanged(auth, user => {
   isAdmin = !!user;
+  myUid = user ? user.uid : null;
+  isMain = myUid === MAIN_UID;
   document.getElementById('fab').classList.toggle('on', isAdmin);
-  document.getElementById('gearRow').hidden = !isAdmin;
+  document.getElementById('gearRow').hidden = !isMain;
   document.getElementById('adminChip').hidden = !isAdmin;
+  document.getElementById('adminChip').textContent = isMain ? '관리자 모드' : '임시 관리자';
   document.getElementById('verLine').hidden = !isAdmin;
-  watchMessages(isAdmin);
-  watchReads(isAdmin);
+  watchMessages(isMain);
+  watchReads(isMain);
   if(user) closeSheet('admin');
 });
 
@@ -1629,6 +1700,8 @@ document.getElementById('saveBtn').onclick = async () => {
 
   const payload = {
     cat: wCat, title, pin: wPin,
+    author: myUid || '',
+    authorName: (auth.currentUser?.email || '').split('@')[0],
     date: multi ? dates[0] : (sessions[0]?.date || ''),
     sessions: multi ? clean : [],
     body: document.getElementById('wBody').value.trim(),
@@ -1663,7 +1736,7 @@ async function loadMeals(){
     const r = await fetch(`${NEIS_URL}meal?from=${plain(from)}&to=${plain(to)}`);
     const d = await r.json();
     meals = (d.list || []).filter(m => m.type === '중식');
-    renderMeal();
+    renderTop();
   }catch{}
 }
 
@@ -1672,23 +1745,86 @@ function fmtYmd(s){                       // 20260824 → 8월 24일 (월)
   return `${d.getMonth()+1}월 ${d.getDate()}일 (${['일','월','화','수','목','금','토'][d.getDay()]})`;
 }
 
-function renderMeal(){
-  const box = document.getElementById('mealBox');
+function renderTop(){
+  const box = document.getElementById('topCards');
   const key = plain(TODAY);
-  const today = meals.find(m => m.date === key);
-  if(!meals.length){ box.innerHTML = ''; return; }
-  box.innerHTML = `<div class="mealcard" id="mealCard">
-    <span class="ml">오늘 급식</span>
-    <span class="mm">${today ? esc(today.menu.join(' · ')) : '급식이 없는 날이에요'}</span>
-  </div>`;
-  document.getElementById('mealCard').onclick = () => {
+  const meal = meals.find(m => m.date === key);
+  const tt   = timetable.filter(t => t.date === key);
+
+  const rows = [];
+  if(meals.length)
+    rows.push(`<div class="tcard" data-go="meal"><span class="tl">오늘 급식</span>
+      <span class="tv">${meal ? esc(meal.menu.join(' · ')) : '급식이 없는 날이에요'}</span></div>`);
+  if(timetable.length)
+    rows.push(`<div class="tcard" data-go="timetable"><span class="tl">오늘 시간표</span>
+      <span class="tv">${tt.length ? esc(tt.map(t => t.subject).join(' · ')) : '수업이 없는 날이에요'}</span></div>`);
+  if(quote?.text || isAdmin)
+    rows.push(`<div class="tcard" data-go="quote"><span class="tl">오늘 명언</span>
+      <span class="tv tq">${quote?.text ? esc(quote.text) + (quote.by ? ` — ${esc(quote.by)}` : '')
+        : '아직 등록된 명언이 없어요'}</span></div>`);
+
+  box.innerHTML = rows.length ? `<div class="topcards">${rows.join('')}</div>` : '';
+  box.querySelectorAll('.tcard').forEach(c => c.onclick = () => openTop(c.dataset.go));
+}
+
+function openTop(kind){
+  const key = plain(TODAY);
+  if(kind === 'meal'){
     document.getElementById('mealBody').innerHTML = meals.map(m => `
       <div class="mealday${m.date===key?' today':''}">
         <b>${fmtYmd(m.date)}${m.date===key?' · 오늘':''}</b>
         <p>${esc(m.menu.join(', '))}</p>
       </div>`).join('') || '<div class="empty">급식 정보가 없어요</div>';
-    openSheet('meal');
-  };
+    openSheet('meal'); return;
+  }
+  if(kind === 'timetable'){
+    const days = [...new Set(timetable.map(t => t.date))];
+    document.getElementById('ttBody').innerHTML = days.map(d => `
+      <div class="mealday${d===key?' today':''}">
+        <b>${fmtYmd(d)}${d===key?' · 오늘':''}</b>
+        <p>${timetable.filter(t => t.date === d)
+              .map(t => `${t.period}교시 ${esc(t.subject)}`).join('  ·  ')}</p>
+      </div>`).join('') || '<div class="empty">시간표 정보가 없어요</div>';
+    openSheet('timetable'); return;
+  }
+  // 명언
+  document.getElementById('quoteBody').innerHTML = quote?.text
+    ? `<p class="dtl-body" style="margin-top:0;font-size:18px;font-weight:700">${esc(quote.text)}</p>
+       ${quote.by ? `<p class="hint" style="font-size:13px">— ${esc(quote.by)}</p>` : ''}`
+    : '<div class="empty"><b>아직 등록된 명언이 없어요</b>관리자가 등록하면 여기에 표시됩니다</div>';
+  const ed = document.getElementById('quoteEdit');
+  ed.hidden = !isAdmin;
+  if(isAdmin){
+    document.getElementById('qText').value = quote?.text || '';
+    document.getElementById('qBy').value   = quote?.by   || '';
+  }
+  openSheet('quote');
+}
+
+const QUOTE = doc(db, 'config', 'quote');
+onSnapshot(QUOTE, s => { quote = s.exists() ? s.data() : null; renderTop(); }, () => {});
+
+document.getElementById('qSave').onclick = async () => {
+  const text = document.getElementById('qText').value.trim();
+  const btn = document.getElementById('qSave');
+  btn.disabled = true; btn.textContent = '저장 중…';
+  try{
+    await setDoc(QUOTE, { text, by: document.getElementById('qBy').value.trim(),
+                          at: serverTimestamp() });
+    closeSheet('quote'); toast(text ? '명언을 등록했어요' : '명언을 지웠어요');
+  }catch{ toast('저장에 실패했어요'); }
+  btn.disabled = false; btn.textContent = '등록';
+};
+
+async function loadTimetable(){
+  const from = new Date(TODAY), to = new Date(TODAY);
+  to.setDate(to.getDate() + 6);
+  try{
+    const r = await fetch(`${NEIS_URL}timetable?from=${plain(from)}&to=${plain(to)}&grade=1&class=3`);
+    const d = await r.json();
+    timetable = d.list || [];
+    renderTop();
+  }catch{}
 }
 
 async function loadSchedule(){
@@ -1708,7 +1844,7 @@ async function loadSchedule(){
   }catch{}
 }
 
-addEventListener('load', () => { loadMeals(); loadSchedule(); });
+addEventListener('load', () => { loadMeals(); loadSchedule(); loadTimetable(); });
 
 /* ═══ 시작 화면 종료 ═══ */
 let booted = false;
