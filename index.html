@@ -66,6 +66,8 @@ body{
 button,input,textarea{font-family:inherit;color:inherit}
 /* 기본은 선택 불가 — 네이티브 앱처럼 */
 body{user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+button, .tab, .row, .grouphead, .tcard, .tbar, .wd, .chk, .mrow2, .pastToggle{
+  touch-action:manipulation; -webkit-tap-highlight-color:transparent}
 /* 복사가 필요한 곳만 허용 */
 .dtl-body, .msg .mt, input, textarea{
   user-select:text;-webkit-user-select:text;-webkit-touch-callout:default}
@@ -122,6 +124,8 @@ main{padding:0 20px}
 .row{display:grid;grid-template-columns:58px 1fr;gap:15px;padding:19px 0;
   border-bottom:1px solid var(--rule);cursor:pointer;align-items:start}
 .row:active{opacity:.55}
+.grouphead:active, .tcard:active, .tbar:active{opacity:.6}
+.tab:active{opacity:.6}
 .dcell{text-align:right;padding-top:1px}
 .dnum{font-size:25px;font-weight:900;letter-spacing:-.06em;line-height:.95;display:block}
 .dlabel{font-size:10.5px;font-weight:700;color:var(--dim);display:block;margin-top:4px}
@@ -610,7 +614,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v68</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v70</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1064,9 +1068,11 @@ function bindChecks(i){
   });
 }
 
+let deleting = false;
 document.getElementById('delBtn').onclick = async () => {
-  if(!current) return;
+  if(!current || deleting) return;
   if(!await ask('이 안내를 삭제할까요?', '삭제한 안내는 복구할 수 없어요.', '삭제', true)) return;
+  deleting = true;
   try{
     const pid = current.id;
     await deleteDoc(doc(db,'notices',pid));
@@ -1075,6 +1081,7 @@ document.getElementById('delBtn').onclick = async () => {
     closeSheet('detail'); toast('삭제했어요');
   }
   catch{ toast('삭제에 실패했어요'); }
+  deleting = false;
 };
 
 /* ═══ 캘린더 내보내기 (.ics) ═══ */
@@ -1173,6 +1180,10 @@ document.getElementById('calBtn').onclick = () => {
 
 
 document.getElementById('shareBtn').onclick = async () => {
+  const sh = document.getElementById('shareBtn');
+  if(sh.dataset.busy === '1') return;
+  sh.dataset.busy = '1';
+  setTimeout(() => sh.dataset.busy = '0', 900);
   if(!current) return;
   const text = `[3반 알리미] ${current.title}\n${korDate(current.date)}`;
   try{
@@ -1230,6 +1241,10 @@ lb.onclick = closeLightbox;
 document.getElementById('lbClose').onclick = e => { e.stopPropagation(); closeLightbox(); };
 document.getElementById('lbImg').onclick = e => e.stopPropagation();
 document.getElementById('lbSave').onclick = async e => {
+  const sv = document.getElementById('lbSave');
+  if(sv.dataset.busy === '1') return;
+  sv.dataset.busy = '1'; sv.textContent = '저장 중…';
+  setTimeout(() => { sv.dataset.busy = '0'; sv.textContent = '사진 저장'; }, 1200);
   e.stopPropagation();
   const src = document.getElementById('lbImg').src; if(!src) return;
   const name = `3반알리미_${String(lbName || '사진').replace(/[\\/:*?"<>|\s]+/g,'_').slice(0,20)}` +
@@ -1356,14 +1371,27 @@ onSnapshot(CFG, snap => {
   renderTabs(); render(); drawCatPick();
 }, () => {});
 
-onSnapshot(query(COL, orderBy('createdAt','desc'), limit(150)), snap => {
-  items = snap.docs.map(d => {
-    const v = d.data();
-    return { id:d.id, cat:v.cat||'', title:v.title||'', date:v.date||'', pin: !!v.pin, author:v.author||'', authorName:v.authorName||'',
-             sessions: Array.isArray(v.sessions) ? v.sessions : [],
-             body:v.body||'', images:v.images||[],
-             createdAt:v.createdAt?.toMillis?.()||null, updatedAt:v.updatedAt?.toMillis?.()||null };
-  });
+const NQ = query(COL, orderBy('createdAt','desc'), limit(150));
+const mapNotice = d => {
+  const v = d.data();
+  return { id:d.id, cat:v.cat||'', title:v.title||'', date:v.date||'', pin: !!v.pin,
+           author:v.author||'', authorName:v.authorName||'',
+           sessions: Array.isArray(v.sessions) ? v.sessions : [],
+           body:v.body||'', images:v.images||[],
+           createdAt:v.createdAt?.toMillis?.()||null, updatedAt:v.updatedAt?.toMillis?.()||null };
+};
+
+// 앱을 다시 열었을 때 실시간 연결이 끊겨 있어도 최신 공지를 받아옴
+async function refreshNotices(){
+  try{
+    const snap = await getDocs(NQ);
+    items = snap.docs.map(mapNotice);
+    renderTabs(); render();
+  }catch{}
+}
+
+onSnapshot(NQ, snap => {
+  items = snap.docs.map(mapNotice);
   render(); maybeNotify(); bootDone();
 }, () => {
   document.getElementById('list').innerHTML =
@@ -1605,6 +1633,8 @@ onAuthStateChanged(auth, user => {
 document.getElementById('loginBtn').onclick = async () => {
   const email = document.getElementById('aEmail').value.trim();
   const pw = document.getElementById('aPw').value;
+  const lgBtn = document.getElementById('loginBtn');
+  lgBtn.disabled = true; lgBtn.textContent = '확인 중…';
   try{
     await signInWithEmailAndPassword(auth, email, pw);
     // 기기의 비밀번호 관리자에 저장 → 인터넷 기록을 지워도 자동 재로그인
@@ -1617,6 +1647,7 @@ document.getElementById('loginBtn').onclick = async () => {
     document.getElementById('aPw').value = '';
     toast('관리자 모드');
   }catch{ toast('이메일이나 비밀번호를 확인해 주세요'); }
+  lgBtn.disabled = false; lgBtn.textContent = '로그인';
 };
 
 // 앱 시작 시 저장된 계정으로 조용히 재로그인 시도
@@ -1709,8 +1740,7 @@ function openWrite(item){
   editId = item ? item.id : null;
   wPin = !!(item && item.pin); picFiles = [];
   wNoti = !item;                       // 수정할 때는 기본으로 알림을 보내지 않음
-  notiBtn.setAttribute('aria-pressed', wNoti ? 'true' : 'false');
-  notiBtn.textContent = wNoti ? '보냄' : '안 보냄';
+  paintNoti();
   pinBtn.setAttribute('aria-pressed', wPin ? 'true' : 'false');
   document.getElementById('draftHint').hidden = !!item;
   document.getElementById('writeTitle').textContent = item ? '안내 수정' : '새 안내';
@@ -1736,14 +1766,21 @@ pinBtn.onclick = () => {
 };
 
 const notiBtn = document.getElementById('notiBtn');
-notiBtn.onclick = () => {
-  wNoti = !wNoti;
+function paintNoti(){
   notiBtn.setAttribute('aria-pressed', wNoti ? 'true' : 'false');
   notiBtn.textContent = wNoti ? '보냄' : '안 보냄';
-};
+}
+notiBtn.onclick = () => { wNoti = !wNoti; paintNoti(); };
 
-document.getElementById('fab').onclick = async () => { openWrite(null); await restoreDraft(); };
-document.getElementById('editBtn').onclick = () => { closeSheet('detail'); openWrite(current); };
+let fabBusy = false;
+document.getElementById('fab').onclick = async () => {
+  if(fabBusy) return;
+  fabBusy = true;
+  openWrite(null);
+  await restoreDraft();
+  fabBusy = false;
+};
+document.getElementById('editBtn').onclick = () => openWrite(current);   // 상세 위에 바로 열기
 
 /* ═══ 임시저장 (사진 제외) ═══ */
 let draftTimer;
@@ -2068,6 +2105,7 @@ addEventListener('load', () => { loadMeals(); loadSchedule(); loadTimetable(); }
 // 자정을 넘기거나 다음 날 다시 열면 D-day·급식·시간표를 새 날짜로 갱신
 document.addEventListener('visibilitychange', () => {
   if(document.hidden) return;
+  refreshNotices();                       // 최신 공지 다시 확인
   const now = midnight(new Date());
   if(now.getTime() !== TODAY.getTime()){
     TODAY = now;
