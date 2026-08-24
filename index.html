@@ -610,7 +610,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v67</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v68</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -806,6 +806,8 @@ function renderTabs(){
     ((schedule.length || items.some(i => i.cat === SCH))
       ? `<button class="tab" role="tab" data-cat="${SCH}" aria-selected="${cat===SCH}">학사일정<span class="n" data-n="${SCH}"></span></button>` : '');
   box.querySelectorAll('.tab').forEach(t => t.onclick = () => {
+    if(cat === t.dataset.cat && !showPast) return;
+    pushView();
     cat = t.dataset.cat; showPast = false;
     if(cat !== 'all') markSeen(cat);
     box.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x===t?'true':'false'));
@@ -869,6 +871,7 @@ function render(){
       + (past.length ? `<div class="grouphead" data-g="__past"><b><i style="background:var(--dimmer)"></i>지난 안내</b><span class="gc">${past.length}건 ›</span></div>` : '');
 
     box.querySelectorAll('.grouphead').forEach(g => g.onclick = () => {
+      pushView();
       if(g.dataset.g === '__past'){ showPast = true; cat = 'all'; }
       else { cat = g.dataset.g; markSeen(cat); }
       renderTabs(); render(); scrollTo({ top:0, behavior:'smooth' });
@@ -883,7 +886,7 @@ function render(){
         (openPast ? '<div class="sechead">지난 안내</div>' + past.map(e => rowHTML(e,true)).join('') : '')
       : '');
   const pt = document.getElementById('pastToggle');
-  if(pt) pt.onclick = () => { showPast = !showPast; render(); };
+  if(pt) pt.onclick = () => { pushView(); showPast = !showPast; render(); };
   box.querySelectorAll('.row').forEach(r => r.onclick = () => openDetail(r.dataset.id));
 }
 
@@ -929,6 +932,7 @@ function renderWeek(all){
     }).join('')}</div>`;
 
   box.querySelectorAll('.wd').forEach(b => b.onclick = () => {
+    pushView();
     weekPick = (weekPick === b.dataset.k) ? '' : b.dataset.k; render();
   });
   document.getElementById('wPrev').onclick = () => { weekStart.setDate(weekStart.getDate()-7); weekPick=''; render(); };
@@ -946,6 +950,7 @@ function paintMoreDot(){
 document.getElementById('moreBtn').onclick = () => openSheet('menu');
 
 document.getElementById('weekBtn').onclick = () => {
+  pushView();
   weekOn = !weekOn; weekPick = ''; weekStart = mondayOf(new Date());
   document.getElementById('weekBtn').setAttribute('aria-pressed', weekOn ? 'true' : 'false');
   render();
@@ -1261,6 +1266,25 @@ addEventListener('popstate', () => {
 });
 history.replaceState({ root:1 }, '');
 history.pushState({ root:1 }, '');
+
+/* 목록 화면 안의 이동(탭·검색·주간·펼치기)도 뒤로가기로 되돌아가게 기록 */
+function viewSnap(){
+  const sr = document.getElementById('searchRow');
+  return { cat, weekOn, weekPick, showPast, topOpen,
+           search: sr ? !sr.hidden : false, q: searchQ };
+}
+function viewApply(s){
+  cat = s.cat; weekOn = s.weekOn; weekPick = s.weekPick;
+  showPast = s.showPast; topOpen = s.topOpen; searchQ = s.q;
+  const sr = document.getElementById('searchRow');
+  const si = document.getElementById('searchInp');
+  if(sr) sr.hidden = !s.search;
+  if(si) si.value = s.q;
+  const wb = document.getElementById('weekBtn');
+  if(wb) wb.setAttribute('aria-pressed', weekOn ? 'true' : 'false');
+  renderTabs(); render(); renderTop();
+}
+function pushView(){ const s = viewSnap(); pushLayer(() => viewApply(s)); }
 
 let sheetZ = 60;                       // 나중에 연 화면이 항상 위로 오도록
 function hideSheet(id){
@@ -1953,7 +1977,7 @@ function renderTop(){
       ${topOpen ? rows.join('') : ''}
     </div>`;
 
-  document.getElementById('tbar').onclick = () => { topOpen = !topOpen; renderTop(); };
+  document.getElementById('tbar').onclick = () => { pushView(); topOpen = !topOpen; renderTop(); };
   box.querySelectorAll('.tcard').forEach(c => c.onclick = () => openTop(c.dataset.go));
 }
 
@@ -2074,6 +2098,7 @@ const searchRow = document.getElementById('searchRow');
 const searchInp = document.getElementById('searchInp');
 
 document.getElementById('searchBtn').onclick = () => {
+  pushView();
   const opening = searchRow.hidden;
   searchRow.hidden = !opening;
   if(opening){ searchInp.focus(); }
@@ -2081,6 +2106,7 @@ document.getElementById('searchBtn').onclick = () => {
 };
 searchInp.oninput = () => { searchQ = searchInp.value; render(); };
 document.getElementById('searchX').onclick = () => {
+  pushView();
   searchRow.hidden = true; searchInp.value = ''; searchQ = ''; render();
 };
 
