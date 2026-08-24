@@ -610,7 +610,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v65</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v67</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -701,6 +701,10 @@ const PALETTE = ['#ffe95c','#c9b8ff','#a3efc9','#ffbf9b','#9fd7ff','#ffb3d1','#d
 const GRAY = '#c4c9d1', MAX_CATS = 8;
 
 let cats = DEFAULT_CATS.map(c => ({...c}));
+try{                                     // 지난번 분류로 먼저 그려 깜빡임 방지
+  const saved = JSON.parse(localStorage.getItem('cats') || 'null');
+  if(Array.isArray(saved) && saved.length) cats = saved;
+}catch{}
 let draft = [];
 const SCH = '__school';
 const catFound = id => cats.findIndex(c => c.id === id);
@@ -722,6 +726,13 @@ const isNew = e => {
   return t > (seenAt[e.item.cat] || 0);
 };
 let schedule = [], meals = [], timetable = [], quote = null;
+try{                                     // 지난번에 받은 값으로 먼저 표시
+  const c = JSON.parse(localStorage.getItem('cache') || 'null');
+  if(c){ meals = c.meals || []; timetable = c.timetable || []; quote = c.quote || null; }
+}catch{}
+function saveCache(){
+  try{ localStorage.setItem('cache', JSON.stringify({ meals, timetable, quote })); }catch{}
+}
 const MAIN_UID = 'zWlG3sYcv8OayfwsoYKYcF8VHz42';   // 총괄 관리자 (Authentication의 사용자 UID)
 let myUid = null, isMain = false;
 const canEdit = i => isAdmin && !i.readonly && (isMain || (i.author && i.author === myUid));
@@ -1197,9 +1208,7 @@ function hideLightbox(){
   if(!document.querySelector('.sheet.on')) document.body.style.overflow='';
 }
 function closeLightbox(){
-  if(!lb.classList.contains('on')) return;
-  if(layers.length) history.back();
-  else hideLightbox();
+  if(lb.classList.contains('on')) history.back();
 }
 document.getElementById('lbPrev').onclick = e => { e.stopPropagation(); lbMove(-1); };
 document.getElementById('lbNext').onclick = e => { e.stopPropagation(); lbMove(1); };
@@ -1243,22 +1252,6 @@ addEventListener('popstate', () => {
     layers.pop()();
     return;
   }
-
-  // 기록과 화면이 어긋난 경우에도 열려 있는 화면을 먼저 닫는다
-  if(lb.classList.contains('on')){
-    history.pushState({ root:1 }, '');
-    hideLightbox();
-    return;
-  }
-  const opens = [...document.querySelectorAll('.sheet.on')];
-  if(opens.length){
-    history.pushState({ root:1 }, '');
-    const top = opens.reduce((a,b) =>
-      (+b.style.zIndex || 60) >= (+a.style.zIndex || 60) ? b : a);
-    hideSheet(top.id);
-    return;
-  }
-
   if(!exitArmed){                        // 목록 화면에서 실수로 나가는 것 방지
     exitArmed = true;
     history.pushState({ root:1 }, '');
@@ -1287,10 +1280,8 @@ window.openSheet = id => {
   pushLayer(() => hideSheet(id));
 };
 window.closeSheet = id => {
-  const el = document.getElementById(id);
-  if(!el.classList.contains('on')) return;
-  if(layers.length) history.back();      // 정상 경로
-  else hideSheet(id);                    // 기록이 비어 있으면 곧바로 닫기
+  if(!document.getElementById(id).classList.contains('on')) return;
+  history.back();
 };
 
 let toastTimer;
@@ -1333,8 +1324,10 @@ const ask  = (title, body, okText='확인', danger=false) => dialog({ title, bod
 /* ═══ 구독 ═══ */
 onSnapshot(CFG, snap => {
   const list = snap.exists() ? snap.data().list : null;
-  if(Array.isArray(list) && list.length)
+  if(Array.isArray(list) && list.length){
     cats = list.filter(c => c && c.id).map(c => ({ id:String(c.id), name:c.name || String(c.id) }));
+    try{ localStorage.setItem('cats', JSON.stringify(cats)); }catch{}
+  }
   if(wCat !== SCH && catFound(wCat) < 0) wCat = cats[0].id;
   renderTabs(); render(); drawCatPick();
 }, () => {});
@@ -1918,7 +1911,7 @@ async function loadMeals(){
     const r = await fetch(`${NEIS_URL}meal?from=${plain(from)}&to=${plain(to)}`);
     const d = await r.json();
     meals = (d.list || []).filter(m => m.type === '중식');
-    renderTop();
+    saveCache(); renderTop();
   }catch{}
 }
 
@@ -1999,7 +1992,7 @@ function openTop(kind){
 }
 
 const QUOTE = doc(db, 'config', 'quote');
-onSnapshot(QUOTE, s => { quote = s.exists() ? s.data() : null; renderTop(); }, () => {});
+onSnapshot(QUOTE, s => { quote = s.exists() ? s.data() : null; saveCache(); renderTop(); }, () => {});
 
 document.getElementById('qSave').onclick = async () => {
   const text = document.getElementById('qText').value.trim();
@@ -2019,12 +2012,13 @@ async function loadTimetable(){
   try{
     const r = await fetch(`${NEIS_URL}timetable?from=${plain(from)}&to=${plain(to)}&grade=1&class=3`);
     const d = await r.json();
-    timetable = (d.list || []).filter(t => {
+    const list = (d.list || []).filter(t => {
       if(/휴업|방학/.test(t.subject)) return false;
       const w = new Date(`${t.date.slice(0,4)}-${t.date.slice(4,6)}-${t.date.slice(6,8)}T00:00:00`).getDay();
       return w !== 0 && w !== 6;                 // 주말 제외
     });
-    renderTop();
+    timetable = list;
+    saveCache(); renderTop();
   }catch{}
 }
 
