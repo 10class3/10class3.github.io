@@ -96,6 +96,9 @@ header{position:sticky;top:0;z-index:20;background:var(--paper);
   font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;
   padding:0;color:var(--dim)}
 .iconbtn svg{display:block}
+.iconbtn:disabled{opacity:.55}
+.iconbtn.busy{animation:busy 0.9s ease infinite}
+@keyframes busy{50%{opacity:.35}}
 .iconbtn[aria-pressed="true"]{border-color:var(--ink);color:var(--ink)}
 
 .tabs{display:flex;gap:19px;margin-top:15px;overflow-x:auto;scrollbar-width:none}
@@ -493,7 +496,7 @@ html.booting .fab{visibility:hidden}
   <button class="filebtn" id="pickBtn">사진 고르기</button>
   <input type="file" id="wFile" accept="image/*" multiple hidden>
   <div class="picked" id="picked"></div>
-  <p class="hint">공지 원본 사진을 그대로 올려도 돼요. 자동으로 용량을 줄여서 저장합니다.</p>
+  <p class="hint">원본 사진을 그대로 올려도 돼요. 최대 8장까지, 자동으로 용량을 맞춰 저장합니다.</p>
   <p class="hint" id="draftHint" hidden>작성 중인 내용은 자동으로 임시저장돼요. (사진은 제외)</p>
 
   <button class="primary" id="saveBtn">올리기</button>
@@ -597,7 +600,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v54</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v57</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -637,7 +640,7 @@ html.booting .fab{visibility:hidden}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, setDoc, onSnapshot,
-         query, orderBy, limit, serverTimestamp }
+         query, where, orderBy, limit, getDocs, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
@@ -711,11 +714,12 @@ if(!devId){
   localStorage.setItem('devId', devId);
 }
 const READS = collection(db, 'reads');
+const PHOTOS = collection(db, 'photos');
 let pics = [], rPics = [], sessions = [], editId = null, wCat = cats[0].id;
 
 /* ═══ 날짜 ═══ */
 const midnight = d => { const x = new Date(d); x.setHours(0,0,0,0); return x; };
-const TODAY = midnight(new Date());
+let TODAY = midnight(new Date());
 const dday = s => s ? Math.round((midnight(new Date(s+'T00:00:00')) - TODAY)/86400000) : null;
 function ddayText(n){
   if(n === null) return { num:'상시', label:'', cls:'none' };
@@ -950,7 +954,13 @@ window.openDetail = id => {
     <div class="dtl-foot"><span>${isMain && readMap[i.id] ? readMap[i.id]+"명 확인" : (i.authorName ? esc(i.authorName) : "3반 알리미")}</span><span>${i.updatedAt?'수정됨 · ':''}${i.createdAt?new Date(i.createdAt).toLocaleDateString('ko-KR')+' 등록':''}</span></div>`;
 
   document.querySelectorAll('#detailBody .dtl-imgs img').forEach((img, n) =>
-    img.onclick = () => openLightbox(i.images, n, i.title));
+    img.onclick = async () => {
+      openLightbox(i.images, n, i.title);
+      const big = await loadPhotos(i.id);          // 선명한 원본으로 교체
+      if(big.length === i.images.length && lb.classList.contains('on')){
+        lbList = big; lbShow();
+      }
+    });
   bindChecks(i);
   document.getElementById('calBtn').hidden = !(i.date || (i.sessions && i.sessions.length));
   document.getElementById('delBtn').hidden = !canEdit(i);
@@ -995,7 +1005,13 @@ function bindChecks(i){
 document.getElementById('delBtn').onclick = async () => {
   if(!current) return;
   if(!await ask('이 안내를 삭제할까요?', '삭제한 안내는 복구할 수 없어요.', '삭제', true)) return;
-  try{ await deleteDoc(doc(db,'notices',current.id)); closeSheet('detail'); toast('삭제했어요'); }
+  try{
+    const pid = current.id;
+    await deleteDoc(doc(db,'notices',pid));
+    getDocs(query(PHOTOS, where('n','==',pid)))
+      .then(s => s.forEach(d => deleteDoc(d.ref).catch(()=>{}))).catch(()=>{});
+    closeSheet('detail'); toast('삭제했어요');
+  }
   catch{ toast('삭제에 실패했어요'); }
 };
 
@@ -1347,6 +1363,7 @@ async function unsubscribe(){
 
 bell.onclick = async () => {
   bell.disabled = true;
+  bell.classList.add('busy');
   if(notifyOn){
     await unsubscribe();
     notifyOn = false; localStorage.setItem('notify','0'); paintBell();
@@ -1359,6 +1376,7 @@ bell.onclick = async () => {
       maybeNotify(true);
     }
   }
+  bell.classList.remove('busy');
   bell.disabled = false;
 };
 
@@ -1597,7 +1615,7 @@ document.getElementById('sessAdd').onclick = () => {
 
 function openWrite(item){
   editId = item ? item.id : null;
-  wPin = !!(item && item.pin);
+  wPin = !!(item && item.pin); picFiles = [];
   pinBtn.setAttribute('aria-pressed', wPin ? 'true' : 'false');
   document.getElementById('draftHint').hidden = !!item;
   document.getElementById('writeTitle').textContent = item ? '안내 수정' : '새 안내';
@@ -1666,28 +1684,47 @@ async function restoreDraft(){
 }
 
 document.getElementById('pickBtn').onclick = () => document.getElementById('wFile').click();
+let picFiles = [];
 document.getElementById('wFile').onchange = async e => {
-  for(const f of [...e.target.files].slice(0, 4 - pics.length)){
-    try{ pics.push(await compress(f)); }catch{ toast('사진 하나를 못 읽었어요'); }
+  const btn = document.getElementById('pickBtn');
+  btn.disabled = true;
+  for(const f of [...e.target.files].slice(0, MAX_PICS - pics.length)){
+    try{ pics.push(await compress(f)); picFiles.push(f); }
+    catch{ toast('사진 하나를 못 읽었어요'); }
   }
-  drawPicked(); e.target.value = '';
+  pics = await fitBudget(pics, picFiles);
+  drawPicked(); e.target.value = ''; btn.disabled = false;
 };
 function drawPicked(){
+  const kb = Math.round(pics.reduce((a,s)=>a+s.length,0) / 1024 * 0.75);
+  document.getElementById('pickBtn').textContent =
+    pics.length ? `사진 ${pics.length}/${MAX_PICS} · ${kb}KB` : '사진 고르기';
   document.getElementById('picked').innerHTML = pics.map((s,n)=>
     `<div class="p"><img src="${s}" alt=""><button class="rm" onclick="dropPic(${n})">✕</button></div>`).join('');
 }
-window.dropPic = n => { pics.splice(n,1); drawPicked(); };
+window.dropPic = n => { pics.splice(n,1); picFiles.splice(n,1); drawPicked(); };
 
-function compress(file){
+const MAX_PICS = 8;
+const PIC_BUDGET = 780000;          // 목록용 작은 사진 합계 상한
+const HI_MAX = 2400, HI_TARGET = 880000;   // 확대용 큰 사진 (한 장씩 따로 저장)
+
+function compress(file, target = 190000, maxSide = 1400){
   return new Promise((res,rej)=>{
     const img = new Image();
     img.onload = () => {
-      const scale = Math.min(1, 1400/Math.max(img.width,img.height));
-      const c = document.createElement('canvas');
-      c.width = Math.round(img.width*scale); c.height = Math.round(img.height*scale);
-      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
-      let q = .75, out = c.toDataURL('image/jpeg', q);
-      while(out.length > 300000 && q > .35){ q -= .1; out = c.toDataURL('image/jpeg', q); }
+      let side = maxSide, out = '';
+      // 화질 → 크기 순으로 낮춰가며 목표 용량에 맞춤
+      for(let round = 0; round < 4; round++){
+        const scale = Math.min(1, side/Math.max(img.width,img.height));
+        const c = document.createElement('canvas');
+        c.width = Math.round(img.width*scale); c.height = Math.round(img.height*scale);
+        c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+        let q = .74;
+        out = c.toDataURL('image/jpeg', q);
+        while(out.length > target && q > .34){ q -= .07; out = c.toDataURL('image/jpeg', q); }
+        if(out.length <= target) break;
+        side = Math.round(side * 0.78);      // 그래도 크면 해상도를 줄여서 재시도
+      }
       URL.revokeObjectURL(img.src); res(out);
     };
     img.onerror = rej;
@@ -1695,9 +1732,56 @@ function compress(file){
   });
 }
 
+// 사진을 추가한 뒤 전체 합계가 넘치면 모두 다시 줄임
+async function fitBudget(list, files){
+  let total = list.reduce((a,s) => a + s.length, 0);
+  if(total <= PIC_BUDGET || !files.length) return list;
+  const per = Math.floor(PIC_BUDGET / list.length);
+  toast('사진 용량을 줄이는 중…');
+  const out = [];
+  for(let n = 0; n < files.length; n++){
+    try{ out.push(await compress(files[n], per, 1200)); }
+    catch{ out.push(list[n]); }
+  }
+  return out;
+}
+
+/* ═══ 확대용 원본급 사진 (한 장 = 한 칸) ═══ */
+async function savePhotos(noticeId){
+  if(!picFiles.length) return;
+  try{
+    // 이 공지의 기존 큰 사진은 정리
+    const old = await getDocs(query(PHOTOS, where('n','==',noticeId)));
+    old.forEach(d => deleteDoc(d.ref).catch(()=>{}));
+  }catch{}
+  for(let n = 0; n < picFiles.length; n++){
+    try{
+      const big = await compress(picFiles[n], HI_TARGET, HI_MAX);
+      await addDoc(PHOTOS, { n: noticeId, i: n, d: big, at: serverTimestamp() });
+    }catch{}
+  }
+}
+
+async function loadPhotos(noticeId){
+  try{
+    const snap = await getDocs(query(PHOTOS, where('n','==',noticeId)));
+    return snap.docs
+      .map(d => d.data())
+      .sort((a,b) => (a.i||0) - (b.i||0))
+      .map(v => v.d)
+      .filter(Boolean);
+  }catch{ return []; }
+}
+
 document.getElementById('saveBtn').onclick = async () => {
   const title = document.getElementById('wTitle').value.trim();
   if(!title){ toast('제목을 입력해 주세요'); return; }
+  // 저장 용량 한도(1MB) 사전 검사 — 넘으면 저장 자체가 실패하므로 미리 안내
+  const size = pics.reduce((a,s) => a + s.length, 0);
+  if(size > 950000){
+    note('사진 용량이 너무 커요', '사진을 한 장 빼면 올릴 수 있어요.');
+    return;
+  }
 
   const clean = sessions.map((s,n) => ({ label:(s.label||'').trim() || `${n+1}차시`, date:s.date||'' }))
                         .filter(s => s.date);
@@ -1720,9 +1804,11 @@ document.getElementById('saveBtn').onclick = async () => {
   try{
     if(editId){
       await updateDoc(doc(db,'notices',editId), { ...payload, updatedAt: serverTimestamp() });
+      savePhotos(editId);
       toast('수정했어요');
     }else{
-      await addDoc(COL, { ...payload, createdAt: serverTimestamp() });
+      const ref = await addDoc(COL, { ...payload, createdAt: serverTimestamp() });
+      savePhotos(ref.id);           // 확대용 큰 사진은 뒤에서 따로 저장
       pushNotice(payload);          // 결과 메시지는 발송까지 끝난 뒤 한 번만
     }
     closeSheet('write'); editId = null;
@@ -1871,6 +1957,17 @@ async function loadSchedule(){
 
 addEventListener('load', () => { loadMeals(); loadSchedule(); loadTimetable(); });
 
+// 자정을 넘기거나 다음 날 다시 열면 D-day·급식·시간표를 새 날짜로 갱신
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden) return;
+  const now = midnight(new Date());
+  if(now.getTime() !== TODAY.getTime()){
+    TODAY = now;
+    renderTabs(); render(); renderTop();
+    loadMeals(); loadTimetable(); loadSchedule();
+  }
+});
+
 /* ═══ 시작 화면 종료 ═══ */
 let booted = false;
 function bootDone(){
@@ -1941,8 +2038,10 @@ async function pushNotice(p){
   try{
     const idToken = await user.getIdToken();
     const when = p.date ? korDate(p.date) : '';
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 8000);
     const res = await fetch(PUSH_URL, {
-      method:'POST',
+      method:'POST', signal: ctrl.signal,
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
         idToken,
@@ -1950,6 +2049,7 @@ async function pushNotice(p){
         body: when ? when + ' · 앱에서 확인하세요' : '새 안내가 등록됐어요'
       })
     });
+    clearTimeout(timer);
     const raw = await res.text();
     let d = {};
     try{ d = JSON.parse(raw); }catch{}
