@@ -248,6 +248,11 @@ html.booting .fab{visibility:hidden}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tcard .tq{font-weight:600;color:var(--ink);white-space:normal;line-height:1.45;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.tbar{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:14px 16px;cursor:pointer;background:var(--soft)}
+.tbar .tv{font-size:14px;font-weight:800;letter-spacing:-.03em}
+.tbar .tarrow{font-size:11px;color:var(--dim)}
+.tcard{border-top:1px solid var(--rule)}
 
 /* 분류별 묶음 헤더 */
 .grouphead{display:flex;align-items:center;justify-content:space-between;gap:10px;
@@ -590,7 +595,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v51</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v52</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -691,7 +696,7 @@ const catColor = id => id === SCH ? '#9fb4d4'
 
 let items = [], cat = 'all', isAdmin = false, current = null, showPast = false, searchQ = '';
 let weekOn = false, weekStart = null, weekPick = '', readMap = {}, wPin = false;
-const foldSet = new Set();
+let topOpen = false;
 let schedule = [], meals = [], timetable = [], quote = null;
 const MAIN_UID = 'zWlG3sYcv8OayfwsoYKYcF8VHz42';   // 총괄 관리자 (Authentication의 사용자 UID)
 let myUid = null, isMain = false;
@@ -787,33 +792,32 @@ function render(){
       : '<div class="empty"><b>아직 올라온 안내가 없어요</b>새 안내가 등록되면 여기에 표시됩니다</div>';
     return;
   }
-  // 전체 탭에서는 분류별로 묶어서 보여줌
-  if(cat === 'all' && !q && !weekPick){
+  // 전체 탭 = 분류별 요약. 누르면 해당 탭으로 이동
+  if(cat === 'all' && !q && !weekPick && !showPast){
     const order = [...cats.map(c => c.id), SCH];
     const groups = order
-      .map(id => ({ id, name: catName(id), list: live.filter(e => e.item.cat === id) }))
-      .filter(g => g.list.length);
-    const etc = live.filter(e => !order.includes(e.item.cat));
-    if(etc.length) groups.push({ id:'', name:'기타', list: etc });
+      .map(id => ({ id, name: catName(id), n: live.filter(e => e.item.cat === id).length }))
+      .filter(g => g.n);
+    const etcN = live.filter(e => !order.includes(e.item.cat)).length;
+
+    if(!groups.length && !etcN && !past.length){
+      box.innerHTML = '<div class="empty"><b>아직 올라온 안내가 없어요</b>새 안내가 등록되면 여기에 표시됩니다</div>';
+      return;
+    }
 
     box.innerHTML = groups.map(g => `
       <div class="grouphead" data-g="${esc(g.id)}">
         <b><mark style="--mk:${catColor(g.id)}">${esc(g.name)}</mark></b>
-        <span class="gc">${g.list.length}건 ${foldSet.has(g.id) ? '▼' : '▲'}</span>
-      </div>
-      ${foldSet.has(g.id) ? '' : g.list.map(e => rowHTML(e,false)).join('')}`).join('')
-      + (past.length ? `<button class="pastToggle" id="pastToggle">${
-          showPast ? '지난 안내 접기 ▲' : `지난 안내 ${past.length}개 보기 ▼`}</button>` +
-          (showPast ? past.map(e => rowHTML(e,true)).join('') : '') : '');
+        <span class="gc">${g.n}건 ›</span>
+      </div>`).join('')
+      + (etcN ? `<div class="grouphead" data-g=""><b>기타</b><span class="gc">${etcN}건 ›</span></div>` : '')
+      + (past.length ? `<div class="grouphead" data-g="__past"><b>지난 안내</b><span class="gc">${past.length}건 ›</span></div>` : '');
 
     box.querySelectorAll('.grouphead').forEach(g => g.onclick = () => {
-      const id = g.dataset.g;
-      foldSet.has(id) ? foldSet.delete(id) : foldSet.add(id);
-      render();
+      if(g.dataset.g === '__past'){ showPast = true; cat = 'all'; }
+      else cat = g.dataset.g;
+      renderTabs(); render(); scrollTo({ top:0, behavior:'smooth' });
     });
-    const pt0 = document.getElementById('pastToggle');
-    if(pt0) pt0.onclick = () => { showPast = !showPast; render(); };
-    box.querySelectorAll('.row').forEach(r => r.onclick = () => openDetail(r.dataset.id));
     return;
   }
 
@@ -1763,7 +1767,22 @@ function renderTop(){
       <span class="tv tq">${quote?.text ? esc(quote.text) + (quote.by ? ` — ${esc(quote.by)}` : '')
         : '아직 등록된 명언이 없어요'}</span></div>`);
 
-  box.innerHTML = rows.length ? `<div class="topcards">${rows.join('')}</div>` : '';
+  if(!rows.length){ box.innerHTML = ''; return; }
+
+  const labels = [];
+  if(meals.length) labels.push('오늘 급식');
+  if(timetable.length) labels.push('오늘 시간표');
+  if(quote?.text || isAdmin) labels.push('오늘 명언');
+
+  box.innerHTML = `<div class="topcards">
+      <div class="tbar" id="tbar">
+        <span class="tv">${labels.join(' · ')}</span>
+        <span class="tarrow">${topOpen ? '▲' : '▼'}</span>
+      </div>
+      ${topOpen ? rows.join('') : ''}
+    </div>`;
+
+  document.getElementById('tbar').onclick = () => { topOpen = !topOpen; renderTop(); };
   box.querySelectorAll('.tcard').forEach(c => c.onclick = () => openTop(c.dataset.go));
 }
 
@@ -1822,7 +1841,11 @@ async function loadTimetable(){
   try{
     const r = await fetch(`${NEIS_URL}timetable?from=${plain(from)}&to=${plain(to)}&grade=1&class=3`);
     const d = await r.json();
-    timetable = d.list || [];
+    timetable = (d.list || []).filter(t => {
+      if(/휴업|방학/.test(t.subject)) return false;
+      const w = new Date(`${t.date.slice(0,4)}-${t.date.slice(4,6)}-${t.date.slice(6,8)}T00:00:00`).getDay();
+      return w !== 0 && w !== 6;                 // 주말 제외
+    });
     renderTop();
   }catch{}
 }
