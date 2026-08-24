@@ -595,7 +595,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v52</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v53</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -747,7 +747,7 @@ function expand(){
 
 /* ═══ 탭 ═══ */
 function renderTabs(){
-  if(cat !== 'all' && catFound(cat) < 0) cat = 'all';
+  if(cat !== 'all' && cat !== SCH && catFound(cat) < 0) cat = 'all';
   const box = document.getElementById('tabs');
   box.innerHTML =
     `<button class="tab" role="tab" data-cat="all" aria-selected="${cat==='all'}">전체<span class="n" data-n="all"></span></button>` +
@@ -755,7 +755,7 @@ function renderTabs(){
     ((schedule.length || items.some(i => i.cat === SCH))
       ? `<button class="tab" role="tab" data-cat="${SCH}" aria-selected="${cat===SCH}">학사일정<span class="n" data-n="${SCH}"></span></button>` : '');
   box.querySelectorAll('.tab').forEach(t => t.onclick = () => {
-    cat = t.dataset.cat;
+    cat = t.dataset.cat; showPast = false;
     box.querySelectorAll('.tab').forEach(x => x.setAttribute('aria-selected', x===t?'true':'false'));
     render();
   });
