@@ -318,7 +318,15 @@ html.booting .fab{visibility:hidden}
 .popt .pn{color:var(--dim);font-size:13px;flex-shrink:0}
 .popt.mine{border-color:var(--ink)}
 .popt.mine .pt::after{content:' ✓';font-weight:900}
-.polltot{font-size:12px;color:var(--dimmer);font-weight:700;margin:10px 0 0}
+.polltot{font-size:12px;color:var(--dimmer);font-weight:700;margin:10px 0 0;line-height:1.6}
+.numgrid{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin:4px 0 6px}
+.numgrid button{padding:11px 0;border:1.5px solid var(--rule);border-radius:9px;background:transparent;
+  font-size:14px;font-weight:800;cursor:pointer;color:var(--ink)}
+.numgrid button:disabled{opacity:.28;cursor:default}
+.numgrid button.mine{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+.pollmode{font-size:12.5px;font-weight:700;color:var(--dim);margin:0 0 12px;letter-spacing:-.02em}
+.missing{font-size:12.5px;font-weight:700;color:var(--urgent);margin:8px 0 0;
+  line-height:1.6;word-break:keep-all}
 
 /* 투표 편집 */
 .pedit{display:flex;gap:8px;margin-bottom:8px}
@@ -538,6 +546,10 @@ html.booting .fab{visibility:hidden}
   <input type="text" id="pollQ" maxlength="40" autocomplete="off" placeholder="예) 반티 색깔 정하기">
   <div id="pollBox"></div>
   <button class="addsess" id="addOpt">＋ 선택지 추가</button>
+  <div class="pinrow" id="pollModeRow">
+    <span>번호 공개 방식</span>
+    <button id="modeBtn" aria-pressed="true">내 번호</button>
+  </div>
   <p class="hint">선택지를 2개 이상 넣으면 공지에 투표가 붙어요. 비우면 투표 없이 등록됩니다.</p>
 
   <label class="f">사진 (최대 12장)</label>
@@ -650,7 +662,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v74</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v75</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -767,7 +779,9 @@ const isNew = e => {
   return t > (seenAt[e.item.cat] || 0);
 };
 let schedule = [], meals = [], timetable = [], quote = null, wHoli = false;
-let opts = [];   // 작성 중인 투표 선택지
+let opts = [], wMode = 'open';   // 작성 중인 투표 선택지 / 번호 방식
+// 우리 반 번호: 1~35 (7번 없음)
+const NUMS = Array.from({length:35}, (_,n) => n+1).filter(n => n !== 7);
 try{                                     // 지난번에 받은 값으로 먼저 표시
   const c = JSON.parse(localStorage.getItem('cache') || 'null');
   if(c){ meals = c.meals || []; timetable = c.timetable || []; quote = c.quote || null; }
@@ -1109,38 +1123,88 @@ function showPoll(i){
   if(!box) return;
   if(!i.poll){ box.innerHTML = ''; return; }
 
-  const draw = counts => {
-    const total = counts.reduce((a,b) => a + b, 0);
-    const mine = Number(localStorage.getItem('vote_' + i.id) ?? -1);
-    const voted = mine >= 0;
+  const anon = i.poll.mode === 'anon';
+  const numKey = 'pollnum_' + i.id;                 // 이 투표에서 내가 쓴 번호
+  let myNum = Number(localStorage.getItem(numKey) || 0) || 0;
+
+  // 번호별 비밀키 — 남이 내 표를 바꾸지 못하게
+  const keyOf = num => {
+    const k = 'pollkey_' + i.id + '_' + num;
+    let v = localStorage.getItem(k);
+    if(!v){ v = Math.random().toString(36).slice(2) + Date.now().toString(36);
+            localStorage.setItem(k, v); }
+    return v;
+  };
+
+  let rows = [];        // [{num, o}]
+
+  function draw(){
+    const used = new Set(rows.map(r => r.num));
+    const counts = i.poll.options.map(() => 0);
+    rows.forEach(r => { if(counts[r.o] !== undefined) counts[r.o]++; });
+    const total = rows.length;
+    const mine = myNum ? rows.find(r => r.num === myNum) : null;
+    const voted = !!mine;
+
+    // ① 번호를 아직 안 고른 경우 → 번호판
+    if(!myNum){
+      box.innerHTML = `<div class="poll">
+        <h4>${esc(i.poll.q || '투표')}</h4>
+        <p class="pollmode">${anon
+          ? '남은 번호 중 아무거나 하나 골라주세요 · 익명 투표예요'
+          : '본인 출석번호를 골라주세요'}</p>
+        <div class="numgrid">${NUMS.map(n => `
+          <button data-n="${n}"${used.has(n) ? ' disabled' : ''}>${n}</button>`).join('')}</div>
+        <p class="polltot">${total}/${NUMS.length}명 참여</p>
+      </div>`;
+      box.querySelectorAll('.numgrid button').forEach(b => b.onclick = () => {
+        myNum = +b.dataset.n;
+        localStorage.setItem(numKey, String(myNum));
+        draw();
+      });
+      return;
+    }
+
+    // ② 번호를 고른 뒤 → 선택지
+    const missing = NUMS.filter(n => !used.has(n));
     box.innerHTML = `<div class="poll">
       <h4>${esc(i.poll.q || '투표')}</h4>
+      <p class="pollmode">${myNum}번으로 참여 중 ${
+        voted ? '' : '· 선택지를 누르면 투표돼요'}
+        <button id="numReset" style="background:none;border:0;color:var(--dim);
+          font-size:12.5px;font-weight:700;cursor:pointer;padding:0 4px">번호 바꾸기</button></p>
       ${i.poll.options.map((o, n) => {
         const pct = total ? Math.round(counts[n] / total * 100) : 0;
-        return `<button class="popt${mine===n?' mine':''}" data-v="${n}">
+        return `<button class="popt${mine && mine.o === n ? ' mine' : ''}" data-v="${n}">
           ${voted ? `<span class="pbar" style="width:${pct}%"></span>` : ''}
           <span class="pt">${esc(o)}</span>
           ${voted ? `<span class="pn">${pct}% · ${counts[n]}표</span>` : ''}
         </button>`;
       }).join('')}
-      <p class="polltot">${voted ? `총 ${total}표 · 다시 눌러 바꿀 수 있어요`
-                                  : '선택지를 누르면 참여돼요'}</p>
+      <p class="polltot">${total}/${NUMS.length}명 참여${
+        voted ? ' · 다른 선택지를 누르면 바뀌어요' : ''}</p>
+      ${(!anon && missing.length && missing.length <= 20)
+        ? `<p class="missing">아직 안 한 번호 · ${missing.join(', ')}</p>` : ''}
     </div>`;
+
+    document.getElementById('numReset').onclick = () => {
+      localStorage.removeItem(numKey); myNum = 0; draw();
+    };
     box.querySelectorAll('.popt').forEach(b => b.onclick = async () => {
       const pick = +b.dataset.v;
       try{
-        await setDoc(doc(db,'votes', `${i.id}_${devId}`),
-          { n:i.id, o:pick, at:serverTimestamp() });
-        localStorage.setItem('vote_' + i.id, String(pick));
-      }catch{ toast('투표에 실패했어요'); }
+        await setDoc(doc(db,'votes', `${i.id}_${myNum}`),
+          { n:i.id, o:pick, num:myNum, k:keyOf(myNum), at:serverTimestamp() });
+      }catch{
+        note('투표할 수 없어요', `${myNum}번은 이미 다른 기기에서 사용했어요.\n번호를 바꿔서 다시 시도해 주세요.`);
+      }
     });
-  };
+  }
 
-  draw(i.poll.options.map(() => 0));
+  draw();
   unsubVote = onSnapshot(query(VOTES, where('n','==',i.id)), snap => {
-    const counts = i.poll.options.map(() => 0);
-    snap.forEach(d => { const o = d.data().o; if(counts[o] !== undefined) counts[o]++; });
-    draw(counts);
+    rows = snap.docs.map(d => d.data()).filter(v => v.num);
+    draw();
   }, () => {});
 }
 
@@ -1856,6 +1920,8 @@ function openWrite(item){
   wPin = !!(item && item.pin); picFiles = [];
   wHoli = !!(item && item.holiday); paintHoli();
   opts = item && item.poll ? [...item.poll.options] : [];
+  wMode = item && item.poll ? (item.poll.mode || 'open') : 'open';
+  paintMode();
   document.getElementById('pollQ').value = item && item.poll ? (item.poll.q || '') : '';
   drawOpts();
   wNoti = !item;                       // 수정할 때는 기본으로 알림을 보내지 않음
@@ -1899,6 +1965,13 @@ function drawOpts(){
   document.getElementById('addOpt').hidden = opts.length >= 6;
 }
 document.getElementById('addOpt').onclick = () => { opts.push(''); drawOpts(); };
+
+const modeBtn = document.getElementById('modeBtn');
+function paintMode(){
+  modeBtn.setAttribute('aria-pressed', wMode === 'open' ? 'true' : 'false');
+  modeBtn.textContent = wMode === 'open' ? '내 번호' : '익명';
+}
+modeBtn.onclick = () => { wMode = wMode === 'open' ? 'anon' : 'open'; paintMode(); saveDraft(); };
 document.getElementById('pollQ').oninput = saveDraft;
 
 const holiBtn = document.getElementById('holiBtn');
@@ -1933,7 +2006,7 @@ function saveDraft(){
   draftTimer = setTimeout(() => {
     const d = {
       cat: wCat, pin: wPin, holiday: wHoli,
-      pollQ: document.getElementById('pollQ').value, opts,
+      pollQ: document.getElementById('pollQ').value, opts, mode: wMode,
       title: document.getElementById('wTitle').value,
       body:  document.getElementById('wBody').value,
       sessions
@@ -1958,6 +2031,7 @@ async function restoreDraft(){
   wCat = (d.cat === SCH || catFound(d.cat) >= 0) ? d.cat : cats[0].id;
   wPin = !!d.pin; wHoli = !!d.holiday; paintHoli();
   opts = Array.isArray(d.opts) ? d.opts : [];
+  wMode = d.mode === 'anon' ? 'anon' : 'open'; paintMode();
   document.getElementById('pollQ').value = d.pollQ || '';
   drawOpts();
   pinBtn.setAttribute('aria-pressed', wPin ? 'true' : 'false');
@@ -2089,7 +2163,7 @@ document.getElementById('saveBtn').onclick = async () => {
     poll: (() => {
       const list = opts.map(s => s.trim()).filter(Boolean);
       return list.length >= 2
-        ? { q: document.getElementById('pollQ').value.trim(), options: list }
+        ? { q: document.getElementById('pollQ').value.trim(), options: list, mode: wMode }
         : null;
     })(),
     author: myUid || '',
