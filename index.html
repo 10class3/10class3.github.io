@@ -31,7 +31,8 @@
 <meta name="theme-color" id="themeMeta" content="#ffffff">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="mask-icon" href="./badge.png" color="#1e2430">
 <meta name="apple-mobile-web-app-title" content="3반 알리미">
 <link rel="apple-touch-icon" href="./icon-192.png">
 <link rel="icon" href="./favicon-light.png" media="(prefers-color-scheme: light)">
@@ -323,6 +324,7 @@ html.booting .fab{visibility:hidden}
 .numgrid button{padding:11px 0;border:1.5px solid var(--rule);border-radius:9px;background:transparent;
   font-size:14px;font-weight:800;cursor:pointer;color:var(--ink)}
 .numgrid button:disabled{opacity:.28;cursor:default}
+.numgrid button:empty{min-height:42px}
 .numgrid button.mine{background:var(--ink);color:var(--paper);border-color:var(--ink)}
 .pollmode{font-size:12.5px;font-weight:700;color:var(--dim);margin:0 0 12px;letter-spacing:-.02em}
 .missing{font-size:12.5px;font-weight:700;color:var(--urgent);margin:8px 0 0;
@@ -662,7 +664,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v75</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v78</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -738,7 +740,8 @@ function applyTheme(t){
   d.dataset.theme = t;
   d.style.background = t === 'dark' ? '#101216' : '#ffffff';
   d.style.colorScheme = t;
-  themeBtn.textContent = t === 'dark' ? '☀' : '☾';
+  themeBtn.textContent = t === 'dark' ? '☾' : '☀';
+  themeBtn.setAttribute('aria-label', t === 'dark' ? '어두운 모드 (누르면 밝게)' : '밝은 모드 (누르면 어둡게)');
   themeMeta.setAttribute('content', t === 'dark' ? '#101216' : '#ffffff');
   localStorage.setItem('theme', t);
 }
@@ -1127,6 +1130,15 @@ function showPoll(i){
   const numKey = 'pollnum_' + i.id;                 // 이 투표에서 내가 쓴 번호
   let myNum = Number(localStorage.getItem(numKey) || 0) || 0;
 
+  // 익명일 때는 번호를 숨기고 자리도 무작위로 섞는다
+  const order = anon ? [...NUMS] : NUMS;
+  if(anon){
+    for(let a = order.length - 1; a > 0; a--){
+      const b = Math.floor(Math.random() * (a + 1));
+      [order[a], order[b]] = [order[b], order[a]];
+    }
+  }
+
   // 번호별 비밀키 — 남이 내 표를 바꾸지 못하게
   const keyOf = num => {
     const k = 'pollkey_' + i.id + '_' + num;
@@ -1151,10 +1163,10 @@ function showPoll(i){
       box.innerHTML = `<div class="poll">
         <h4>${esc(i.poll.q || '투표')}</h4>
         <p class="pollmode">${anon
-          ? '남은 번호 중 아무거나 하나 골라주세요 · 익명 투표예요'
+          ? '빈 칸 아무거나 하나 눌러주세요 · 익명 투표예요'
           : '본인 출석번호를 골라주세요'}</p>
-        <div class="numgrid">${NUMS.map(n => `
-          <button data-n="${n}"${used.has(n) ? ' disabled' : ''}>${n}</button>`).join('')}</div>
+        <div class="numgrid">${order.map((n, idx) => `
+          <button data-n="${n}"${used.has(n) ? ' disabled' : ''}>${anon ? '' : n}</button>`).join('')}</div>
         <p class="polltot">${total}/${NUMS.length}명 참여</p>
       </div>`;
       box.querySelectorAll('.numgrid button').forEach(b => b.onclick = () => {
@@ -1169,10 +1181,11 @@ function showPoll(i){
     const missing = NUMS.filter(n => !used.has(n));
     box.innerHTML = `<div class="poll">
       <h4>${esc(i.poll.q || '투표')}</h4>
-      <p class="pollmode">${myNum}번으로 참여 중 ${
+      <p class="pollmode">${anon ? '익명으로 참여 중' : myNum + '번으로 참여 중'} ${
         voted ? '' : '· 선택지를 누르면 투표돼요'}
         <button id="numReset" style="background:none;border:0;color:var(--dim);
-          font-size:12.5px;font-weight:700;cursor:pointer;padding:0 4px">번호 바꾸기</button></p>
+          font-size:12.5px;font-weight:700;cursor:pointer;padding:0 4px">${
+          anon ? '다시 고르기' : '번호 바꾸기'}</button></p>
       ${i.poll.options.map((o, n) => {
         const pct = total ? Math.round(counts[n] / total * 100) : 0;
         return `<button class="popt${mine && mine.o === n ? ' mine' : ''}" data-v="${n}">
@@ -1196,7 +1209,9 @@ function showPoll(i){
         await setDoc(doc(db,'votes', `${i.id}_${myNum}`),
           { n:i.id, o:pick, num:myNum, k:keyOf(myNum), at:serverTimestamp() });
       }catch{
-        note('투표할 수 없어요', `${myNum}번은 이미 다른 기기에서 사용했어요.\n번호를 바꿔서 다시 시도해 주세요.`);
+        note('투표할 수 없어요', anon
+          ? '이미 사용된 칸이에요.\n다시 고르기를 눌러 다른 칸을 선택해 주세요.'
+          : `${myNum}번은 이미 다른 기기에서 사용했어요.\n번호를 바꿔서 다시 시도해 주세요.`);
       }
     });
   }
@@ -1801,6 +1816,7 @@ onAuthStateChanged(auth, user => {
   document.getElementById('fab').classList.toggle('on', isAdmin);
   document.getElementById('gearRow').hidden = !isMain;
   document.getElementById('backupRow').hidden = !isMain;
+
   document.getElementById('adminChip').hidden = !isAdmin;
   document.getElementById('adminChip').textContent = isMain ? '관리자 모드' : '임시 관리자';
   document.getElementById('verLine').hidden = !isAdmin;
@@ -2167,7 +2183,7 @@ document.getElementById('saveBtn').onclick = async () => {
         : null;
     })(),
     author: myUid || '',
-    authorName: (auth.currentUser?.email || '').split('@')[0],
+    authorName: '작성자',
     date: multi ? dates[0] : (sessions[0]?.date || ''),
     sessions: multi ? clean : [],
     body: document.getElementById('wBody').value.trim(),
