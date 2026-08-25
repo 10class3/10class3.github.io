@@ -1,9 +1,9 @@
 // ── 3반 알리미 서비스워커 (캐시 + 푸시 알림) ──
 // 앱을 수정하면 아래 숫자를 v11, v12... 로 올리세요
-const CACHE = 'banner-v71';
+const CACHE = 'banner-v74';
 const ASSETS = ['./', './index.html', './manifest.json',
                 './icon-192.png', './icon-512.png', './icon-splash.png',
-                './favicon-light.png', './favicon-dark.png'];
+                './favicon-light.png', './favicon-dark.png', './badge.png'];
 
 /* ── 푸시 알림 ── */
 importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js');
@@ -26,9 +26,14 @@ messaging.onBackgroundMessage(payload => {
   self.registration.showNotification(d.title || '3반 알리미', {
     body: d.body || '',
     icon: './icon-192.png',
-    badge: './icon-192.png',
-    tag: d.tag || 'notice',
-    data: { url: d.url || './' }
+    badge: './badge.png',              // 상태표시줄용 단색 아이콘
+    tag: d.tag || 'notice',            // 같은 종류는 하나로 합쳐짐
+    renotify: false,
+    vibrate: [0],                      // 조용한 진동 (기기 설정 우선)
+    silent: false,
+    requireInteraction: false,
+    data: { url: d.url || './' },
+    actions: [{ action: 'open', title: '확인하기' }]
   });
 });
 
@@ -48,6 +53,11 @@ self.addEventListener('notificationclick', e => {
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
   self.skipWaiting();
+});
+
+// 앱에서 '새 버전 적용' 신호가 오면 곧바로 교체
+self.addEventListener('message', e => {
+  if(e.data && e.data.type === 'SKIP_WAITING') self.skipWaiting();
 });
 
 self.addEventListener('activate', e => {
