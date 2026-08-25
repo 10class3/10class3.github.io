@@ -84,8 +84,8 @@ header{position:sticky;top:0;z-index:20;background:var(--paper);
 .brand h1{font-size:26px;font-weight:900;letter-spacing:-.045em;margin:0;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .iconbtn.dot{position:relative}
-.iconbtn.dot::after{content:'';position:absolute;top:4px;right:5px;width:7px;height:7px;
-  border-radius:50%;background:var(--urgent)}
+.iconbtn.dot::after{content:'';position:absolute;top:3px;right:3px;width:8px;height:8px;
+  border-radius:50%;background:var(--urgent);border:1.5px solid var(--paper)}
 .mrow2{display:flex;align-items:center;justify-content:space-between;gap:14px;
   padding:15px 2px;border-bottom:1px solid var(--rule)}
 .mrow2 > span{font-size:15px;font-weight:700;letter-spacing:-.03em}
@@ -665,7 +665,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v79</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v80</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1614,6 +1614,8 @@ const BELL_OFF = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none"
 
 function paintBell(){
   bell.innerHTML = notifyOn ? BELL_ON : BELL_OFF;
+  // 아직 켜지 않았다면 알림 버튼에도 표시
+  bell.classList.toggle('dot', !notifyOn && localStorage.getItem('notify') !== '0');
   paintMoreDot();
   bell.setAttribute('aria-pressed', notifyOn ? 'true' : 'false');
   bell.setAttribute('aria-label', notifyOn ? '알림 켜짐' : '알림 꺼짐');
