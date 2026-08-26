@@ -55,8 +55,9 @@ html[data-theme="dark"]{
   --markpos:88%; --soft:#171a20;
 }
 html{background:var(--paper);transition:background .2s ease}
-html,body{max-width:100%;overflow-x:hidden}
-.sheet{overflow-x:hidden}
+/* 가로 넘침만 잘라냄 (세로 스크롤에는 영향 없음) */
+body{overflow-x:clip}
+main, header{max-width:100%}
 /* 긴 주소·긴 단어가 화면을 밀어내지 않게 */
 .dtl-body, .dtl-title, .rtitle, .rprev, .chk span, .ilink, .msg .mt{
   overflow-wrap:anywhere; word-break:break-word}
@@ -710,7 +711,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v95</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v96</p>
 </section>
 
 <!-- 설치 안내 -->
