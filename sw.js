@@ -1,6 +1,6 @@
 // ── 3반 알리미 서비스워커 (캐시 + 푸시 알림) ──
 // 앱을 수정하면 아래 숫자를 v11, v12... 로 올리세요
-const CACHE = 'banner-v90';
+const CACHE = 'banner-v91';
 const ASSETS = ['./', './index.html', './manifest.json',
                 './icon-192.png', './icon-512.png', './icon-splash.png',
                 './favicon-light.png', './favicon-dark.png', './badge.png'];
@@ -73,8 +73,13 @@ self.addEventListener('fetch', e => {
       url.hostname.includes('gstatic.com') ||
       url.hostname.includes('firebase')) return;
 
+  // 우리 파일은 브라우저 저장본을 건너뛰고 항상 서버에서 최신인지 확인
+  const fresh = url.origin === self.location.origin
+    ? new Request(e.request, { cache: 'no-cache' })
+    : e.request;
+
   e.respondWith(
-    fetch(e.request).then(res => {
+    fetch(fresh).then(res => {
       const copy = res.clone();
       caches.open(CACHE).then(c => c.put(e.request, copy));
       return res;
