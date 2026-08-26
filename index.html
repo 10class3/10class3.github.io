@@ -685,7 +685,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v88</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v89</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -2522,7 +2522,10 @@ if(!standalone) iBtn.hidden = false;
 addEventListener('beforeinstallprompt', e => {
   e.preventDefault(); deferred = e; waiters.forEach(f=>f(e)); waiters = [];
 });
-addEventListener('appinstalled', () => { iBtn.hidden = true; toast('설치했어요'); });
+addEventListener('appinstalled', () => {
+  iBtn.hidden = true;
+  toast('설치했어요 · 홈 화면에서 열어보세요', 4000);
+});
 
 function waitPrompt(ms){
   if(deferred) return Promise.resolve(deferred);
@@ -2538,29 +2541,42 @@ const isKakao   = /KAKAOTALK/i.test(UA);
 const inApp = /KAKAOTALK|NAVER|DaumApps|Instagram|FBAN|FBAV|FB_IAB|Line\/|everytime|Snapchat|Threads|Whale/i.test(UA);
 if(!standalone) iBtn.textContent = inApp ? (isIOS ? 'Safari로 열기' : '크롬으로 열기') : (isIOS ? '설치 방법' : '설치');
 
+let installing = false;
 iBtn.onclick = async () => {
   if(inApp){ escapeInApp(false); return; }
   if(isIOS){ showHowto(); return; }
-  if(deferred){
-    deferred.prompt();
-    const { outcome } = await deferred.userChoice;
-    deferred = null;
-    if(outcome === 'accepted') iBtn.hidden = true;
-    return;
-  }
+  if(installing) return;                      // 연속 클릭 방지
+
+  installing = true;
   const label = iBtn.textContent;
-  iBtn.textContent = '준비 중…';
-  const p = await waitPrompt(4000);
-  iBtn.textContent = label;
-  if(p){
-    p.prompt();
-    const { outcome } = await p.userChoice;
-    deferred = null;
-    if(outcome === 'accepted') iBtn.hidden = true;
-    return;
+  let p = deferred;
+
+  if(!p){                                     // 아직 준비 전이면 기다림
+    iBtn.textContent = '준비 중…';
+    p = await waitPrompt(8000);               // 느린 연결도 감안
+    iBtn.textContent = label;
   }
-  showHowto();
+
+  if(p){
+    try{
+      p.prompt();
+      await p.userChoice;                     // 설치 여부는 appinstalled로만 판단
+    }catch{
+      showHowto();                            // 이미 사용된 창이면 안내로 대체
+    }
+    deferred = null;
+  }else{
+    showHowto();                              // 설치 창을 못 띄우면 방법 안내
+  }
+  installing = false;                         // 버튼은 계속 남아 있음
 };
+
+// 설치 여부를 화면 상태로 다시 확인 (취소했을 때 버튼이 사라지지 않도록)
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden) return;
+  const now = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+  iBtn.hidden = now;
+});
 
 function escapeInApp(auto){
   const url = location.href.split('#')[0];
