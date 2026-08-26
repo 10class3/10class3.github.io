@@ -447,6 +447,12 @@ html.booting .fab{visibility:hidden}
 #mOk.danger{background:var(--urgent);color:#fff}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 
+/* 아이폰: 입력칸을 누를 때 화면이 확대되지 않도록 (16px 미만이면 자동 확대됨) */
+@supports (-webkit-touch-callout: none){
+  input, textarea, select{font-size:16px}
+  .numgrid button{font-size:15px}
+}
+
 /* 태블릿·PC: 내용을 가운데로 모아 읽기 편하게 */
 @media (min-width: 760px){
   header, .sheet{
@@ -665,7 +671,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v80</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v81</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1110,8 +1116,9 @@ window.openDetail = id => {
     img.onclick = async () => {
       openLightbox(i.images, n, i.title);
       const big = await loadPhotos(i.id);          // 선명한 원본으로 교체
-      if(big.length === i.images.length && lb.classList.contains('on')){
-        lbList = big; lbShow();
+      if(big.length && lb.classList.contains('on')){
+        lbList = i.images.map((thumb, k) => big[k] || thumb);
+        lbShow();
       }
     });
   bindChecks(i);
@@ -2142,6 +2149,8 @@ async function fitBudget(list, files){
 /* ═══ 확대용 원본급 사진 (한 장 = 한 칸) ═══ */
 async function savePhotos(noticeId){
   if(!picFiles.length) return;
+  // 기존 사진을 남겨둔 채 일부만 추가한 경우엔 원본을 건드리지 않음
+  if(picFiles.length !== pics.length) return;
   try{
     // 이 공지의 기존 큰 사진은 정리
     const old = await getDocs(query(PHOTOS, where('n','==',noticeId)));
@@ -2158,11 +2167,9 @@ async function savePhotos(noticeId){
 async function loadPhotos(noticeId){
   try{
     const snap = await getDocs(query(PHOTOS, where('n','==',noticeId)));
-    return snap.docs
-      .map(d => d.data())
-      .sort((a,b) => (a.i||0) - (b.i||0))
-      .map(v => v.d)
-      .filter(Boolean);
+    const arr = [];
+    snap.forEach(d => { const v = d.data(); if(v.d) arr[v.i || 0] = v.d; });
+    return arr;
   }catch{ return []; }
 }
 
@@ -2170,6 +2177,8 @@ document.getElementById('saveBtn').onclick = async () => {
   const title = document.getElementById('wTitle').value.trim();
   if(!title){ toast('제목을 입력해 주세요'); return; }
   // 저장 용량 한도(1MB) 사전 검사 — 넘으면 저장 자체가 실패하므로 미리 안내
+  if(editId && picFiles.length && picFiles.length !== pics.length)
+    toast('기존 사진은 그대로 두고 저장해요', 3000);
   const size = pics.reduce((a,s) => a + s.length, 0);
   if(size > 780000){
     note('사진이 너무 많아요', '사진을 몇 장 빼면 올릴 수 있어요.');
