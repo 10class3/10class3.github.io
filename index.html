@@ -565,7 +565,8 @@ html.booting .fab{visibility:hidden}
   <button class="filebtn" id="pickBtn">사진 고르기</button>
   <input type="file" id="wFile" accept="image/*" multiple hidden>
   <div class="picked" id="picked"></div>
-  <p class="hint">원본 사진을 그대로 올려도 돼요. 목록에는 작게 보이지만,<br>눌러서 크게 보거나 저장할 때는 원본에 가까운 화질로 나옵니다.</p>
+  <p class="hint">최대 12장. 카메라의 <b>문서 스캔</b>으로 찍어 올리면<br>
+  글씨가 가장 또렷하게 저장됩니다 (최대 3500px).</p>
   <p class="hint" id="draftHint" hidden>작성 중인 내용은 자동으로 임시저장돼요. (사진은 제외)</p>
 
   <button class="primary" id="saveBtn">올리기</button>
@@ -671,7 +672,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v81</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v86</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1115,7 +1116,7 @@ window.openDetail = id => {
   document.querySelectorAll('#detailBody .dtl-imgs img').forEach((img, n) =>
     img.onclick = async () => {
       openLightbox(i.images, n, i.title);
-      const big = await loadPhotos(i.id);          // 선명한 원본으로 교체
+      const big = await loadPhotos(i.id);          // 원본 → 없으면 중간본 → 없으면 썸네일
       if(big.length && lb.classList.contains('on')){
         lbList = i.images.map((thumb, k) => big[k] || thumb);
         lbShow();
@@ -2097,33 +2098,31 @@ window.dropPic = n => { pics.splice(n,1); picFiles.splice(n,1); drawPicked(); };
 const MAX_PICS = 12;
 const PIC_BUDGET = 600000;              // 썸네일 합계 (작게 유지 — 목록에서만 쓰임)
 const THUMB_MAX = 640;                  // 썸네일 해상도 (화면엔 90px로 표시됨)
-let HI_MAX = 3200, HI_TARGET = 980000;     // 확대·저장용 원본급 (한 장 = 한 칸)
-// 저장 공간에 여유가 있으면 해상도를 한 단계 올림
-if(navigator.storage && navigator.storage.estimate){
-  navigator.storage.estimate().then(e => {
-    const free = (e.quota || 0) - (e.usage || 0);
-    if(free > 500 * 1024 * 1024) HI_MAX = 4000;
-  }).catch(()=>{});
-}
+/* 문서 스캔본 기준 설정
+   글자는 해상도가 살아야 읽히므로 크기를 우선하고, 화질도 높게 시작한다 */
+const HI_MAX = 3500, HI_TARGET = 980000;
 
 function compress(file, target = 190000, maxSide = 1400){
   return new Promise((res,rej)=>{
     const img = new Image();
     img.onload = () => {
       let side = maxSide, out = '';
-      // 해상도를 최대한 지키고 화질부터 낮춤 (작은 글씨가 뭉개지지 않도록)
-      for(let round = 0; round < 5; round++){
+      // 글자가 뭉개지지 않도록: 화질은 78%까지만 낮추고, 그 아래로는 해상도를 줄인다
+      for(let round = 0; round < 6; round++){
         const scale = Math.min(1, side/Math.max(img.width,img.height));
         const c = document.createElement('canvas');
         c.width = Math.round(img.width*scale); c.height = Math.round(img.height*scale);
         const ctx = c.getContext('2d');
+        ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
+        ctx.fillStyle = '#fff';                     // 문서 배경을 흰색으로 고정
+        ctx.fillRect(0, 0, c.width, c.height);
         ctx.drawImage(img,0,0,c.width,c.height);
-        let q = .92;
+        let q = .94;
         out = c.toDataURL('image/jpeg', q);
-        while(out.length > target && q > .42){ q -= .06; out = c.toDataURL('image/jpeg', q); }
+        while(out.length > target && q > .78){ q -= .04; out = c.toDataURL('image/jpeg', q); }
         if(out.length <= target) break;
-        side = Math.round(side * 0.85);
+        side = Math.round(side * 0.88);             // 화질 대신 크기를 조금씩 줄임
       }
       URL.revokeObjectURL(img.src); res(out);
     };
@@ -2151,6 +2150,8 @@ async function savePhotos(noticeId){
   if(!picFiles.length) return;
   // 기존 사진을 남겨둔 채 일부만 추가한 경우엔 원본을 건드리지 않음
   if(picFiles.length !== pics.length) return;
+  const many = picFiles.length;
+  if(many > 2) toast(`사진 저장 중… (${many}장)`, 4000);
   try{
     // 이 공지의 기존 큰 사진은 정리
     const old = await getDocs(query(PHOTOS, where('n','==',noticeId)));
