@@ -55,6 +55,11 @@ html[data-theme="dark"]{
   --markpos:88%; --soft:#171a20;
 }
 html{background:var(--paper);transition:background .2s ease}
+html,body{max-width:100%;overflow-x:hidden}
+.sheet{overflow-x:hidden}
+/* 긴 주소·긴 단어가 화면을 밀어내지 않게 */
+.dtl-body, .dtl-title, .rtitle, .rprev, .chk span, .ilink, .msg .mt{
+  overflow-wrap:anywhere; word-break:break-word}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{margin:0;padding:0;background:var(--paper)}
 body{
@@ -179,7 +184,8 @@ main{padding:0 20px}
 .sesslist .sdd.done{color:var(--dimmer)}
 .dtl-body{font-size:15.5px;line-height:1.72;white-space:pre-wrap;margin:22px 0 0;letter-spacing:-.02em;word-break:keep-all}
 .dtl-imgs{margin-top:24px;display:flex;flex-direction:column;gap:11px}
-.dtl-imgs img{width:100%;border-radius:9px;border:1px solid var(--rule);display:block;cursor:zoom-in}
+.dtl-imgs img{width:100%;max-width:100%;height:auto;border-radius:9px;
+  border:1px solid var(--rule);display:block;cursor:zoom-in}
 .imgcap{font-size:11.5px;color:var(--dimmer);font-weight:600;text-align:center;margin-top:-4px}
 .dtl-foot{margin-top:34px;padding-top:16px;border-top:1px solid var(--rule);
   font-size:12px;color:var(--dimmer);font-weight:600;display:flex;justify-content:space-between}
@@ -351,7 +357,8 @@ html.booting .fab{visibility:hidden}
 .chk.on span{color:var(--dimmer);text-decoration:line-through}
 .chknote{font-size:11.5px;color:var(--dimmer);font-weight:600;margin:10px 0 0}
 .ilink{color:#5b8ae6;text-decoration:underline;text-underline-offset:3px;
-  word-break:break-all;font-weight:700}
+  word-break:break-all;overflow-wrap:anywhere;font-weight:700;
+  display:inline-block;max-width:100%}
 .ilink:active{opacity:.6}
 
 /* 고정 토글 */
@@ -558,7 +565,8 @@ html.booting .fab{visibility:hidden}
   <label class="f">일정</label>
   <div id="rangeBox" hidden>
     <div class="srow"><span class="rlab">시작</span><input type="date" id="rFrom"></div>
-    <div class="srow"><span class="rlab">종료</span><input type="date" id="rTo"></div>
+    <div class="srow"><span class="rlab">종료</span><input type="date" id="rTo">
+      <input type="time" id="rTime" step="300" title="마감 시간(선택)"></div>
   </div>
   <div id="sessBox"></div>
   <datalist id="labelHints">
@@ -567,7 +575,8 @@ html.booting .fab{visibility:hidden}
     <option value="1차시"><option value="2차시"><option value="시험일"><option value="발표일">
   </datalist>
   <button class="filebtn" id="sessAdd" style="padding:11px;font-size:13px">＋ 날짜 추가</button>
-  <p class="hint">날짜를 추가하면 <b>왼쪽 칸에 이름</b>을 적을 수 있어요.<br>
+  <p class="hint">시간 칸은 비워도 돼요. 적으면 '오후 3시까지'처럼 표시됩니다.<br>
+  날짜를 추가하면 <b>왼쪽 칸에 이름</b>을 적을 수 있어요.<br>
   예) 신청 마감 8/28 · 활동 시작 8/30 · 활동 종료 9/11<br>
   이름마다 D-day가 따로 표시되고, 지난 것은 자동으로 흐려져요. 날짜를 비우면 '상시'로 올라갑니다.</p>
 
@@ -696,7 +705,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v92</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v94</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -875,6 +884,15 @@ const linkify = s => String(s).replace(
   /(https?:\/\/[^\s<>"']+)/g,
   '<a href="$1" target="_blank" rel="noopener noreferrer" class="ilink">$1</a>');
 
+// 15:30 → 오후 3시 30분
+function timeText(t){
+  if(!t || !/^\d{2}:\d{2}$/.test(t)) return '';
+  const [H, M] = t.split(':').map(Number);
+  const ap = H < 12 ? '오전' : '오후';
+  const h12 = H % 12 === 0 ? 12 : H % 12;
+  return `${ap} ${h12}시${M ? ' ' + M + '분' : ''}`;
+}
+
 const esc = (s='') => String(s).replace(/[&<>"]/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));
 
 /* 안내 → 차시 단위로 펼치기 */
@@ -886,11 +904,12 @@ function expand(){
       const key = ymd(TODAY);
       // 시작 전이면 시작일 기준, 진행 중이거나 끝났으면 종료일 기준
       out.push({ item:i, date: key < i.range.from ? i.range.from : i.range.to,
-                 sess:'', range:i.range });
+                 sess:'', range:i.range, time: i.range.time || '' });
       return;
     }
     if(i.sessions && i.sessions.length){
-      i.sessions.forEach((s,n) => out.push({ item:i, date:s.date||'', sess:s.label || `${n+1}차시` }));
+      i.sessions.forEach((s,n) => out.push({
+        item:i, date:s.date||'', time:s.time||'', sess:s.label || `${n+1}차시` }));
     }else{
       out.push({ item:i, date:i.date||'', sess:'' });
     }
@@ -1006,7 +1025,8 @@ function renderUrgent(all){
     soon.map(e => `<div class="ub" data-id="${e.item.id}">
       <b>${ddayText(dday(e.date)).num}</b>
       <span><i style="background:${catColor(e.item.cat)}"></i>${esc(catName(e.item.cat))} · ${
-        e.sess?esc(e.sess)+' · ':''}${esc(e.item.title)}</span></div>`).join('') + '</div>';
+        e.sess?esc(e.sess)+' · ':''}${esc(e.item.title)}${
+        e.time ? ' (' + timeText(e.time) + ')' : ''}</span></div>`).join('') + '</div>';
   box.querySelectorAll('.ub').forEach(u => u.onclick = () => openDetail(u.dataset.id));
 }
 
@@ -1114,7 +1134,8 @@ function rowHTML(e, isPast){
     }">${d.num}</span>${d.label?`<span class="dlabel">${d.label}</span>`:''}</div>
     <div>
       <h2 class="rtitle">${i.pin?'<span class="pin">고정</span>':''}${i.holiday?'<span class="holi">휴일</span>':''}${i.poll?'<span class="pollchip">투표</span>':''}${e.sess?`<span class="chip">${esc(e.sess)}</span>`:''}<mark style="--mk:${catColor(i.cat)}">${esc(i.title)}</mark></h2>
-      <div class="rmeta"><span class="cat">${esc(catName(i.cat))}</span><span>·</span><span>${e.range ? korDate(e.range.from) + ' ~ ' + korDate(e.range.to) : korDate(e.date)}</span>${
+      <div class="rmeta"><span class="cat">${esc(catName(i.cat))}</span><span>·</span><span>${e.range ? korDate(e.range.from) + ' ~ ' + korDate(e.range.to) : korDate(e.date)}${
+        e.time ? ' ' + timeText(e.time) + '까지' : ''}</span>${
         isMain && readMap[i.id] ? `<span>·</span><span>${readMap[i.id]}명 확인</span>` : ''}</div>
       ${i.body?`<p class="rprev">${esc(i.body)}</p>`:''}
       ${thumbs?`<div class="thumbs">${thumbs}</div>`:''}
@@ -1139,7 +1160,7 @@ window.openDetail = id => {
       const t = ddayText(dday(s.date));
       return `<li>
         <span class="sl">${esc(s.label || (n+1)+'차시')}</span>
-        <span class="sd">${korDate(s.date)}</span>
+        <span class="sd">${korDate(s.date)}${s.time ? ' ' + timeText(s.time) : ''}</span>
         <span class="sdd ${dday(s.date)!==null && dday(s.date)<0 ? 'done' : t.cls}">${t.num}</span>
       </li>`;
     }).join('') + '</ul>';
@@ -1149,9 +1170,12 @@ window.openDetail = id => {
       const state = key < i.range.from ? ddayText(dday(i.range.from)).num
                   : key <= i.range.to  ? '진행 중'
                   : '종료';
-      sched = `<div class="dtl-date">${korDate(i.range.from)} ~ ${korDate(i.range.to)} · ${state}</div>`;
+      const tm = i.range.time ? ' ' + timeText(i.range.time) + '까지' : '';
+      sched = `<div class="dtl-date">${korDate(i.range.from)} ~ ${korDate(i.range.to)}${tm} · ${state}</div>`;
     }else{
-      sched = `<div class="dtl-date">${korDate(i.date)}${i.date?' · '+ddayText(dday(i.date)).num:''}</div>`;
+      const one = (i.sessions && i.sessions[0]) || {};
+      const tm = one.time ? ' ' + timeText(one.time) + '까지' : '';
+      sched = `<div class="dtl-date">${korDate(i.date)}${tm}${i.date?' · '+ddayText(dday(i.date)).num:''}</div>`;
     }
   }
 
@@ -2006,12 +2030,15 @@ function drawSessions(){
     <div class="srow">
       ${multi ? `<input type="text" data-sl="${n}" value="${esc(s.label)}" maxlength="8" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="${n+1}차시" list="labelHints">` : ''}
       <input type="date" data-sd="${n}" value="${esc(s.date)}">
+      <input type="time" data-st="${n}" value="${esc(s.time || '')}" step="300" title="마감 시간(선택)">
       ${multi ? `<button class="del" data-sdel="${n}" aria-label="삭제">✕</button>` : ''}
     </div>`).join('');
   document.querySelectorAll('#sessBox [data-sl]').forEach(i =>
     i.oninput = () => { sessions[i.dataset.sl].label = i.value; saveDraft(); });
   document.querySelectorAll('#sessBox [data-sd]').forEach(i =>
     i.onchange = () => { sessions[i.dataset.sd].date = i.value; saveDraft(); });
+  document.querySelectorAll('#sessBox [data-st]').forEach(i =>
+    i.onchange = () => { sessions[i.dataset.st].time = i.value; saveDraft(); });
   document.querySelectorAll('#sessBox [data-sdel]').forEach(b => b.onclick = () => {
     sessions.splice(+b.dataset.sdel,1); drawSessions();
   });
@@ -2028,6 +2055,7 @@ function openWrite(item){
   wRange = !!(item && item.range);
   document.getElementById('rFrom').value = item && item.range ? item.range.from : '';
   document.getElementById('rTo').value   = item && item.range ? item.range.to   : '';
+  document.getElementById('rTime').value = item && item.range ? (item.range.time || '') : '';
   paintRange();
   opts = item && item.poll ? [...item.poll.options] : [];
   wMode = item && item.poll ? (item.poll.mode || 'open') : 'open';
@@ -2095,6 +2123,7 @@ function paintRange(){
 rangeBtn.onclick = () => { wRange = !wRange; paintRange(); saveDraft(); };
 document.getElementById('rFrom').onchange = saveDraft;
 document.getElementById('rTo').onchange = saveDraft;
+document.getElementById('rTime').onchange = saveDraft;
 
 const holiBtn = document.getElementById('holiBtn');
 function paintHoli(){
@@ -2131,6 +2160,7 @@ function saveDraft(){
       pollQ: document.getElementById('pollQ').value, opts, mode: wMode,
       range: wRange, rFrom: document.getElementById('rFrom').value,
       rTo: document.getElementById('rTo').value,
+      rTime: document.getElementById('rTime').value,
       title: document.getElementById('wTitle').value,
       body:  document.getElementById('wBody').value,
       sessions
@@ -2159,6 +2189,7 @@ async function restoreDraft(){
   wRange = !!d.range;
   document.getElementById('rFrom').value = d.rFrom || '';
   document.getElementById('rTo').value   = d.rTo || '';
+  document.getElementById('rTime').value = d.rTime || '';
   paintRange();
   document.getElementById('pollQ').value = d.pollQ || '';
   drawOpts();
@@ -2294,7 +2325,8 @@ document.getElementById('saveBtn').onclick = async () => {
       if(!wRange) return null;
       const f = document.getElementById('rFrom').value;
       const t = document.getElementById('rTo').value;
-      return (f && t) ? { from: f, to: t } : null;
+      const tm = document.getElementById('rTime').value;
+      return (f && t) ? { from: f, to: t, time: tm || '' } : null;
     })(),
     poll: (() => {
       const list = opts.map(s => s.trim()).filter(Boolean);
