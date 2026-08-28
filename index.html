@@ -402,7 +402,9 @@ html.booting .fab{visibility:hidden}
 .msg .mt{font-size:14.5px;line-height:1.6;white-space:pre-wrap;letter-spacing:-.02em;word-break:keep-all;margin:0}
 .msg .mimgs{display:flex;gap:6px;margin-top:9px}
 .msg .mimgs img{width:64px;height:64px;object-fit:cover;border-radius:6px;border:1px solid var(--rule);cursor:zoom-in}
-.msg .mdel{background:none;border:0;color:var(--urgent);font-size:11.5px;font-weight:700;cursor:pointer;padding:8px 0 0}
+.msg .macts{display:flex;gap:16px;align-items:center;padding-top:8px}
+.msg .mcopy{background:none;border:0;color:var(--dim);font-size:11.5px;font-weight:700;cursor:pointer;padding:0}
+.msg .mdel{background:none;border:0;color:var(--urgent);font-size:11.5px;font-weight:700;cursor:pointer;padding:0}
 .badge{background:var(--urgent);color:#fff;border-radius:999px;font-size:10px;font-weight:800;
   padding:1px 5px;margin-left:5px;vertical-align:1px}
 
@@ -748,7 +750,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v99</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v100</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1930,20 +1932,28 @@ document.getElementById('rSend').onclick = async () => {
   btn.disabled = false; btn.textContent = '보내기';
 };
 
+let msgLatest = 0;
+function updateMailDot(){
+  const seen = Number(localStorage.getItem('msgSeen') || 0);
+  const more = document.getElementById('moreBtn');
+  more.dataset.mail = (msgLatest && msgLatest > seen) ? '1' : '0';
+  paintMoreDot();
+}
+
 function watchMessages(on){
   const mailBtn = document.getElementById('mailBtn');
   const mailRow = document.getElementById('mailRow');
   const moreBtn = document.getElementById('moreBtn');
   if(!on){
     if(unsubMsg){ unsubMsg(); unsubMsg = null; }
-    mailRow.hidden = true; moreBtn.dataset.mail = '0'; paintMoreDot(); return;
+    mailRow.hidden = true; msgLatest = 0; moreBtn.dataset.mail = '0'; paintMoreDot(); return;
   }
   mailRow.hidden = false;
   unsubMsg = onSnapshot(query(MSG, orderBy('createdAt','desc'), limit(100)), snap => {
     const list = snap.docs.map(d => ({ id:d.id, ...d.data(), createdAt:d.data().createdAt?.toMillis?.()||null }));
     mailBtn.innerHTML = list.length ? `열기<span class="badge">${list.length}</span>` : '열기';
-    moreBtn.dataset.mail = list.length ? '1' : '0';
-    paintMoreDot();
+    msgLatest = list.length ? (list[0].createdAt || 0) : 0;
+    updateMailDot();
     document.getElementById('inboxBody').innerHTML = list.length
       ? list.map(m => `<div class="msg">
           <div class="mh">
@@ -1952,7 +1962,10 @@ function watchMessages(on){
           </div>
           <p class="mt">${esc(m.text)}</p>
           ${(m.images||[]).length ? `<div class="mimgs">${m.images.map(s=>`<img src="${s}" alt="첨부 사진">`).join('')}</div>` : ''}
-          <button class="mdel" data-mid="${m.id}">삭제</button>
+          <div class="macts">
+            <button class="mcopy" data-mtext="${esc(m.text)}">복사</button>
+            <button class="mdel" data-mid="${m.id}">삭제</button>
+          </div>
         </div>`).join('')
       : '<div class="empty"><b>받은 메시지가 없어요</b>친구들이 보낸 건의가 여기 쌓입니다</div>';
 
@@ -1960,13 +1973,31 @@ function watchMessages(on){
       const srcs = [...mbox.querySelectorAll('img')].map(i => i.src);
       mbox.querySelectorAll('img').forEach((img, n) => img.onclick = () => openLightbox(srcs, n, '건의사진'));
     });
+    document.querySelectorAll('#inboxBody .mcopy').forEach(b => b.onclick = async () => {
+      const t = b.dataset.mtext || '';
+      try{
+        await navigator.clipboard.writeText(t);
+        toast('복사했어요');
+      }catch{
+        const ta = document.createElement('textarea');
+        ta.value = t; ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try{ document.execCommand('copy'); toast('복사했어요'); }
+        catch{ toast('복사하지 못했어요'); }
+        ta.remove();
+      }
+    });
     document.querySelectorAll('#inboxBody .mdel').forEach(b => b.onclick = async () => {
       if(!await ask('이 메시지를 삭제할까요?', '', '삭제', true)) return;
       try{ await deleteDoc(doc(db,'messages',b.dataset.mid)); }catch{ toast('삭제 실패'); }
     });
   }, () => {});
 }
-document.getElementById('mailBtn').onclick = () => openSheet('inbox');
+document.getElementById('mailBtn').onclick = () => {
+  if(msgLatest) localStorage.setItem('msgSeen', String(msgLatest));
+  updateMailDot();
+  openSheet('inbox');
+};
 
 /* ═══ 관리자 ═══ */
 let taps = 0, tapTimer;
