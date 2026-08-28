@@ -426,8 +426,10 @@ html.booting .fab{visibility:hidden}
   background:rgba(255,255,255,.92);color:#14161a;border:0;border-radius:999px;
   padding:12px 24px;font-size:14px;font-weight:800;letter-spacing:-.03em;cursor:pointer;
   backdrop-filter:blur(6px);box-shadow:0 4px 16px rgba(0,0,0,.35)}
-.pastToggle{display:block;width:100%;margin-top:20px;padding:12px;border:0;background:transparent;
-  color:var(--dimmer);font-size:12.5px;font-weight:800;letter-spacing:.02em;cursor:pointer}
+.pastToggle{display:block;width:100%;margin-top:22px;padding:13px;
+  border:1.5px solid var(--rule);border-radius:11px;background:transparent;
+  color:var(--dim);font-size:13.5px;font-weight:800;letter-spacing:-.02em;cursor:pointer}
+.pastToggle:active{background:var(--soft)}
 
 /* 스켈레톤 로딩 */
 .skel{display:grid;grid-template-columns:58px 1fr;gap:15px;padding:19px 0;border-bottom:1px solid var(--rule)}
@@ -727,7 +729,7 @@ html.booting .fab{visibility:hidden}
     <div class="fsrow"><button id="fsMinus">가−</button><span id="fsVal">100%</span><button id="fsPlus">가＋</button></div></div>
   <div class="mrow2" id="flashRow" hidden style="display:block">
     <span style="display:block;margin-bottom:9px">즉시 공지
-      <small class="hint" style="margin:4px 0 0;display:block">목록 맨 위에 흐르는 문구로 표시돼요 (12시간 뒤 자동 사라짐)</small></span>
+      <small class="hint" style="margin:4px 0 0;display:block">목록 맨 위에 흐르는 문구로 표시돼요. <b>내리기</b>를 누를 때까지 계속 보입니다.</small></span>
     <div style="display:flex;gap:8px">
       <input type="text" id="flashInp" maxlength="60" autocomplete="off"
         style="flex:1;padding:11px 13px;border:1.5px solid var(--rule);border-radius:10px;
@@ -746,7 +748,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v98</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v99</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1721,7 +1723,7 @@ onSnapshot(CFG, snap => {
   renderTabs(); render(); drawCatPick();
 }, () => {});
 
-const NQ = query(COL, orderBy('createdAt','desc'), limit(150));
+const NQ = query(COL, orderBy('createdAt','desc'), limit(400));
 const mapNotice = d => {
   const v = d.data();
   return { id:d.id, cat:v.cat||'', title:v.title||'', date:v.date||'', pin: !!v.pin,
@@ -2528,7 +2530,7 @@ const MEGAPHONE = `<svg viewBox="0 0 24 24" width="19" height="19" fill="none"
 
 function renderFlash(){
   const box = document.getElementById('flashBox');
-  const live = flash && flash.text && flash.until && Date.now() < flash.until;
+  const live = flash && (flash.text || flash.img);
   if(!live){ box.innerHTML = ''; return; }
   const secs = Math.max(9, Math.round(flash.text.length * 0.42));   // 길수록 천천히
   box.innerHTML = `<div class="flash" id="flashCard">
@@ -2547,12 +2549,10 @@ onSnapshot(FLASH, s => {
   renderFlash();
   const inp = document.getElementById('flashInp');
   const clear = document.getElementById('flashClear');
-  const live = flash && flash.text && flash.until && Date.now() < flash.until;
-  if(inp && !inp.matches(':focus')) inp.value = live ? flash.text : '';
+  const live = flash && (flash.text || flash.img);
+  if(inp && !inp.matches(':focus')) inp.value = live ? (flash.text || '') : '';
   if(clear) clear.hidden = !live;
 }, () => {});
-
-setInterval(renderFlash, 60000);        // 만료되면 스스로 사라짐
 
 /* 즉시 공지 사진 (한 장, 저장 한도 안에 들어가도록 작게) */
 let flashImg = '';
@@ -2593,7 +2593,6 @@ document.getElementById('flashSave').onclick = async () => {
       text: text || '사진을 확인해 주세요',
       img: flashImg || '',
       by: '작성자',
-      until: Date.now() + 12*3600*1000,
       at: serverTimestamp()
     });
     flashImg = ''; drawFlashPrev();
@@ -2606,7 +2605,7 @@ document.getElementById('flashSave').onclick = async () => {
 
 document.getElementById('flashClear').onclick = async () => {
   try{
-    await setDoc(FLASH, { text:'', img:'', until:0 });
+    await setDoc(FLASH, { text:'', img:'' });
     flashImg = ''; drawFlashPrev();
     toast('즉시 공지를 내렸어요');
   }
