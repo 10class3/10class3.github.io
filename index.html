@@ -266,6 +266,18 @@ html.booting .fab{visibility:hidden}
   .bootbars i{animation:none;width:var(--w)}
 }
 
+/* 첨부 파일 */
+.files{margin-top:22px;display:flex;flex-direction:column;gap:8px}
+.fitem{display:flex;align-items:center;gap:12px;padding:13px 14px;border:1.5px solid var(--rule);
+  border-radius:11px;background:transparent;width:100%;text-align:left;cursor:pointer}
+.fitem:active{background:var(--soft)}
+.fitem .fi{flex-shrink:0;color:var(--dim);display:flex}
+.fitem .fn{flex:1;min-width:0;font-size:14px;font-weight:700;letter-spacing:-.03em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fitem .fs{font-size:12px;font-weight:700;color:var(--dimmer);flex-shrink:0}
+.filechip{display:inline-block;font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;
+  border:1.5px solid var(--rule);color:var(--dim);margin-right:6px;vertical-align:2px}
+
 /* 즉시 공지 배너 */
 .flash{display:flex;align-items:center;gap:10px;margin:14px 0 0;padding:12px 14px;
   border-radius:12px;cursor:pointer;overflow:hidden;
@@ -624,6 +636,13 @@ html.booting .fab{visibility:hidden}
   </div>
   <p class="hint">선택지를 2개 이상 넣으면 공지에 투표가 붙어요. 비우면 투표 없이 등록됩니다.</p>
 
+  <label class="f">파일 (최대 3개 · 개당 4MB)</label>
+  <button class="filebtn" id="docPick">파일 고르기</button>
+  <input type="file" id="docFile" multiple hidden
+    accept=".pdf,.hwp,.hwpx,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.zip">
+  <div id="docList"></div>
+  <p class="hint">문서·PDF를 올릴 수 있어요. 동영상처럼 큰 파일은 링크를 본문에 적어주세요.</p>
+
   <label class="f">사진 (최대 12장)</label>
   <button class="filebtn" id="pickBtn">사진 고르기</button>
   <input type="file" id="wFile" accept="image/*" multiple hidden>
@@ -750,7 +769,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v100</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v101</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -904,6 +923,7 @@ if(!devId){
 const READS = collection(db, 'reads');
 const PHOTOS = collection(db, 'photos');
 const VOTES  = collection(db, 'votes');
+const FILES  = collection(db, 'files');
 let pics = [], rPics = [], sessions = [], editId = null, wCat = cats[0].id;
 
 /* ═══ 날짜 ═══ */
@@ -1198,7 +1218,8 @@ function rowHTML(e, isPast){
       String(d.num).length >= 6 ? 'xlong' : String(d.num).length >= 5 ? 'long' : ''
     }">${d.num}</span>${d.label?`<span class="dlabel">${d.label}</span>`:''}</div>
     <div>
-      <h2 class="rtitle">${i.pin?'<span class="pin">고정</span>':''}${i.holiday?'<span class="holi">휴일</span>':''}${i.poll?'<span class="pollchip">투표</span>':''}${e.sess?`<span class="chip">${esc(e.sess)}</span>`:''}<mark style="--mk:${catColor(i.cat)}">${esc(i.title)}</mark></h2>
+      <h2 class="rtitle">${i.pin?'<span class="pin">고정</span>':''}${i.holiday?'<span class="holi">휴일</span>':''}${i.poll?'<span class="pollchip">투표</span>':''}${
+        (i.files&&i.files.length)?'<span class="filechip">파일</span>':''}${e.sess?`<span class="chip">${esc(e.sess)}</span>`:''}<mark style="--mk:${catColor(i.cat)}">${esc(i.title)}</mark></h2>
       <div class="rmeta"><span class="cat">${esc(catName(i.cat))}</span><span>·</span><span>${e.range ? rangeText(e.range)
               : korDate(e.date) + (e.time ? ' ' + timeText(e.time) + '까지' : '')}</span>${
         isMain && readMap[i.id] ? `<span>·</span><span>${readMap[i.id]}명 확인</span>` : ''}</div>
@@ -1245,6 +1266,7 @@ window.openDetail = id => {
     ${sched}
     ${bodyHTML(i)}
     ${imgs?`<div class="dtl-imgs">${imgs}<p class="imgcap">사진을 누르면 크게 볼 수 있어요</p></div>`:''}
+    <div id="fileView"></div>
     <div id="pollView"></div>
     <div class="dtl-foot"><span>${isMain && readMap[i.id] ? readMap[i.id]+"명 확인" : (i.authorName ? esc(i.authorName) : "3반 알리미")}</span><span>${i.updatedAt?'수정됨 · ':''}${i.createdAt?new Date(i.createdAt).toLocaleDateString('ko-KR')+' 등록':''}</span></div>`;
 
@@ -1258,6 +1280,7 @@ window.openDetail = id => {
       }
     });
   bindChecks(i);
+  showFiles(i);
   showPoll(i);
   document.getElementById('calBtn').hidden = !(i.date || (i.sessions && i.sessions.length));
   document.getElementById('delBtn').hidden = !canEdit(i);
@@ -1420,6 +1443,8 @@ document.getElementById('delBtn').onclick = async () => {
     getDocs(query(PHOTOS, where('n','==',pid)))
       .then(s => s.forEach(d => deleteDoc(d.ref).catch(()=>{}))).catch(()=>{});
     getDocs(query(VOTES, where('n','==',pid)))
+      .then(s => s.forEach(d => deleteDoc(d.ref).catch(()=>{}))).catch(()=>{});
+    getDocs(query(FILES, where('n','==',pid)))
       .then(s => s.forEach(d => deleteDoc(d.ref).catch(()=>{}))).catch(()=>{});
     closeSheet('detail'); toast('삭제했어요');
   }
@@ -1732,6 +1757,7 @@ const mapNotice = d => {
            author:v.author||'', authorName:v.authorName||'', holiday: !!v.holiday,
            poll: (v.poll && Array.isArray(v.poll.options) && v.poll.options.length >= 2) ? v.poll : null,
            range: (v.range && (v.range.from || v.range.to)) ? v.range : null,
+           files: Array.isArray(v.files) ? v.files : [],
            sessions: Array.isArray(v.sessions) ? v.sessions : [],
            body:v.body||'', images:v.images||[],
            createdAt:v.createdAt?.toMillis?.()||null, updatedAt:v.updatedAt?.toMillis?.()||null };
@@ -2147,6 +2173,8 @@ function openWrite(item){
   document.getElementById('rTime').value = item && item.range ? (item.range.time || '') : '';
   document.getElementById('rFromTime').value = item && item.range ? (item.range.fromTime || '') : '';
   paintRange();
+  docs = item && item.files ? item.files.map(f => ({ ...f, file:null })) : [];
+  drawDocs();
   opts = item && item.poll ? [...item.poll.options] : [];
   wMode = item && item.poll ? (item.poll.mode || 'open') : 'open';
   paintMode();
@@ -2414,6 +2442,7 @@ document.getElementById('saveBtn').onclick = async () => {
 
   const payload = {
     cat: wCat, title, pin: wPin, holiday: wHoli,
+    files: docs.map(d => ({ name: d.name, size: d.size })),
     range: (() => {
       if(!wRange) return null;
       const f = document.getElementById('rFrom').value;
@@ -2444,12 +2473,12 @@ document.getElementById('saveBtn').onclick = async () => {
   try{
     if(editId){
       await updateDoc(doc(db,'notices',editId), { ...payload, updatedAt: serverTimestamp() });
-      savePhotos(editId);
+      savePhotos(editId); saveFiles(editId);
       if(wNoti) pushNotice(payload);
       toast('수정했어요');
     }else{
       const ref = await addDoc(COL, { ...payload, createdAt: serverTimestamp() });
-      savePhotos(ref.id);           // 확대용 큰 사진은 뒤에서 따로 저장
+      savePhotos(ref.id); saveFiles(ref.id);
       if(wNoti) pushNotice(payload);
       else toast('공지를 올렸어요 · 알림은 보내지 않았어요', 4000);
     }
@@ -2548,6 +2577,120 @@ function openTop(kind){
     document.getElementById('qBy').value   = quote?.by   || '';
   }
   openSheet('quote');
+}
+
+/* ═══ 첨부 파일 ═══ */
+const FCHUNK = 700000;          // 한 칸에 담는 크기
+const FMAX_PARTS = 8;           // 파일 하나당 최대 칸 수 (약 4MB)
+const FMAX = 3;                 // 공지 하나당 파일 개수
+
+let docs = [];                  // 작성 중인 파일 [{file, name, size}]
+
+const DOC_ICON = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+  <path d="M14 2v6h6"/></svg>`;
+
+const sizeText = n => n >= 1048576 ? (n/1048576).toFixed(1) + 'MB'
+                    : Math.max(1, Math.round(n/1024)) + 'KB';
+
+document.getElementById('docPick').onclick = () => document.getElementById('docFile').click();
+document.getElementById('docFile').onchange = e => {
+  for(const f of [...e.target.files].slice(0, FMAX - docs.length)){
+    if(f.size > FCHUNK * FMAX_PARTS * 0.72){
+      note('파일이 너무 커요', `${f.name}\n4MB까지 올릴 수 있어요.\n큰 파일은 링크를 본문에 적어주세요.`);
+      continue;
+    }
+    docs.push({ file: f, name: f.name, size: f.size, type: f.type || '' });
+  }
+  drawDocs(); e.target.value = '';
+};
+
+function drawDocs(){
+  document.getElementById('docList').innerHTML = docs.map((d,n) => `
+    <div class="fitem" style="cursor:default">
+      <span class="fi">${DOC_ICON}</span>
+      <span class="fn">${esc(d.name)}</span>
+      <span class="fs">${sizeText(d.size)}</span>
+      <button class="del" data-fdel="${n}" aria-label="삭제">✕</button>
+    </div>`).join('');
+  document.querySelectorAll('#docList [data-fdel]').forEach(b =>
+    b.onclick = () => { docs.splice(+b.dataset.fdel, 1); drawDocs(); });
+  document.getElementById('docPick').textContent =
+    docs.length ? `파일 ${docs.length}/${FMAX}개` : '파일 고르기';
+  document.getElementById('docPick').hidden = docs.length >= FMAX;
+}
+
+// 저장: 새로 고른 파일만 조각내어 기록
+async function saveFiles(noticeId){
+  if(!docs.length || !docs.some(d => d.file)) return;
+  try{
+    const old = await getDocs(query(FILES, where('n','==',noticeId)));
+    old.forEach(d => deleteDoc(d.ref).catch(()=>{}));
+  }catch{}
+  toast('파일 올리는 중…', 5000);
+  for(let n = 0; n < docs.length; n++){
+    const d = docs[n];
+    if(!d.file) continue;
+    try{
+      const data = await new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload = () => res(r.result); r.onerror = rej;
+        r.readAsDataURL(d.file);
+      });
+      const parts = Math.ceil(data.length / FCHUNK);
+      if(parts > FMAX_PARTS) continue;
+      for(let p = 0; p < parts; p++){
+        await addDoc(FILES, {
+          n: noticeId, i: n, p, total: parts,
+          name: d.name, size: d.size,
+          d: data.slice(p * FCHUNK, (p + 1) * FCHUNK),
+          at: serverTimestamp()
+        });
+      }
+    }catch{}
+  }
+  toast('파일을 올렸어요', 2500);
+}
+
+// 상세에서 파일 목록·내려받기
+function showFiles(i){
+  const box = document.getElementById('fileView');
+  if(!box) return;
+  const list = i.files || [];
+  if(!list.length){ box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="files">${list.map((f,n) => `
+    <button class="fitem" data-fi="${n}">
+      <span class="fi">${DOC_ICON}</span>
+      <span class="fn">${esc(f.name)}</span>
+      <span class="fs">${sizeText(f.size || 0)}</span>
+    </button>`).join('')}</div>`;
+
+  box.querySelectorAll('.fitem').forEach(b => b.onclick = async () => {
+    const n = +b.dataset.fi, meta = list[n];
+    const nameEl = b.querySelector('.fn');
+    const keep = nameEl.textContent;
+    nameEl.textContent = '내려받는 중…';
+    try{
+      const snap = await getDocs(query(FILES, where('n','==',i.id)));
+      const parts = []; let total = 0;
+      snap.forEach(dd => {
+        const v = dd.data();
+        if((v.i || 0) !== n || !v.d) return;
+        total = v.total || 1; parts[v.p || 0] = v.d;
+      });
+      if(!total || parts.filter(Boolean).length !== total)
+        throw new Error('일부 조각 없음');
+
+      const a = document.createElement('a');
+      a.href = parts.join(''); a.download = meta.name || 'file';
+      document.body.appendChild(a); a.click(); a.remove();
+      toast('파일을 저장했어요');
+    }catch{
+      note('파일을 받지 못했어요', '업로드가 중간에 끊겼을 수 있어요.\n관리자에게 다시 올려달라고 알려주세요.');
+    }
+    nameEl.textContent = keep;
+  });
 }
 
 /* ═══ 즉시 공지 ═══ */
