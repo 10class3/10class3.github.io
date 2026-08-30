@@ -772,7 +772,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v104</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v105</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -2861,14 +2861,42 @@ async function loadSchedule(){
   try{
     const r = await fetch(`${NEIS_URL}schedule?from=${plain(from)}&to=${plain(to)}`);
     const d = await r.json();
-    schedule = (d.list || []).map(s => ({
-      id: 'sch_' + s.date + '_' + s.name.slice(0,6),
-      cat: SCH, title: s.name,
-      date: `${s.date.slice(0,4)}-${s.date.slice(4,6)}-${s.date.slice(6,8)}`,
-      sessions: [], body: s.note || '', images: [],
-      readonly: true, createdAt: null, updatedAt: null, pin: false,
-      holiday: HOLI.test(s.name)
-    }));
+    const MY_GRADE = 1;
+    const iso = y => `${y.slice(0,4)}-${y.slice(4,6)}-${y.slice(6,8)}`;
+    const nextDay = y => {
+      const t = new Date(iso(y) + 'T00:00:00');
+      t.setDate(t.getDate() + 1);
+      return `${t.getFullYear()}${String(t.getMonth()+1).padStart(2,'0')}${String(t.getDate()).padStart(2,'0')}`;
+    };
+
+    // 같은 이름이 이어지는 날은 하나로 묶음 (겨울방학처럼 긴 일정)
+    const raw = [...(d.list || [])].sort((a,b) =>
+      a.date.localeCompare(b.date) || a.name.localeCompare(b.name));
+    const merged = [];
+    raw.forEach(s => {
+      const prev = merged.find(m => m.name === s.name && nextDay(m.last) === s.date);
+      if(prev) prev.last = s.date;
+      else merged.push({ ...s, last: s.date });
+    });
+
+    schedule = merged.map(s => {
+      // 학년 정보: 나이스 값 + 제목에 적힌 학년
+      const g = Array.isArray(s.grades) ? s.grades : [];
+      const named = [1,2,3].filter(n => new RegExp(n + '\\s*학년').test(s.name));
+      const all = [...new Set([...g, ...named])].sort();
+      const multi = s.last !== s.date;
+      return {
+        id: 'sch_' + s.date + '_' + s.name.slice(0,6),
+        cat: SCH, title: s.name,
+        grades: all,
+        mine: all.length === 0 || all.includes(MY_GRADE),
+        date: iso(s.date),
+        range: multi ? { from: iso(s.date), to: iso(s.last) } : null,
+        sessions: [], body: s.note || '', images: [],
+        readonly: true, createdAt: null, updatedAt: null, pin: false,
+        holiday: HOLI.test(s.name)
+      };
+    });
     renderTabs(); render();
   }catch{}
 }
