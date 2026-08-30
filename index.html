@@ -277,6 +277,9 @@ html.booting .fab{visibility:hidden}
 .fitem .fs{font-size:12px;font-weight:700;color:var(--dimmer);flex-shrink:0}
 .filechip{display:inline-block;font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;
   border:1.5px solid var(--rule);color:var(--dim);margin-right:6px;vertical-align:2px}
+.gradechip{display:inline-block;font-size:10px;font-weight:800;padding:2px 6px;border-radius:5px;
+  background:var(--rule);color:var(--dim);margin-right:6px;vertical-align:2px}
+.gradechip.mine{background:#4b7bd6;color:#fff}
 
 /* 즉시 공지 배너 */
 .flash{display:flex;align-items:center;gap:10px;margin:14px 0 0;padding:12px 14px;
@@ -769,7 +772,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v102</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v104</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1219,7 +1222,9 @@ function rowHTML(e, isPast){
     }">${d.num}</span>${d.label?`<span class="dlabel">${d.label}</span>`:''}</div>
     <div>
       <h2 class="rtitle">${i.pin?'<span class="pin">고정</span>':''}${i.holiday?'<span class="holi">휴일</span>':''}${i.poll?'<span class="pollchip">투표</span>':''}${
-        (i.files&&i.files.length)?'<span class="filechip">파일</span>':''}${e.sess?`<span class="chip">${esc(e.sess)}</span>`:''}<mark style="--mk:${catColor(i.cat)}">${esc(i.title)}</mark></h2>
+        (i.files&&i.files.length)?'<span class="filechip">파일</span>':''}${
+        (i.grades && i.grades.length && i.grades.length < 3)
+          ? `<span class="gradechip${i.mine?' mine':''}">${i.grades.join('·')}학년</span>` : ''}${e.sess?`<span class="chip">${esc(e.sess)}</span>`:''}<mark style="--mk:${catColor(i.cat)}">${esc(i.title)}</mark></h2>
       <div class="rmeta"><span class="cat">${esc(catName(i.cat))}</span><span>·</span><span>${e.range ? rangeText(e.range)
               : korDate(e.date) + (e.time ? ' ' + timeText(e.time) + '까지' : '')}</span>${
         isMain && readMap[i.id] ? `<span>·</span><span>${readMap[i.id]}명 확인</span>` : ''}</div>
@@ -2852,7 +2857,7 @@ async function loadTimetable(){
 
 async function loadSchedule(){
   const from = new Date(TODAY), to = new Date(TODAY);
-  to.setDate(to.getDate() + 120);
+  to.setDate(to.getDate() + 365);          // 1년치 (겨울방학·종업식까지 포함)
   try{
     const r = await fetch(`${NEIS_URL}schedule?from=${plain(from)}&to=${plain(to)}`);
     const d = await r.json();
