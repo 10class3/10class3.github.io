@@ -769,7 +769,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v101</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v102</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -2165,7 +2165,9 @@ document.getElementById('sessAdd').onclick = () => {
 
 function openWrite(item){
   editId = item ? item.id : null;
-  wPin = !!(item && item.pin); picFiles = [];
+  wPin = !!(item && item.pin);
+  // 기존 사진은 원래 자리를 기억해두고, 새로 고른 사진만 파일을 들고 있음
+  picFiles = (item && item.images ? item.images : []).map((_, n) => ({ old: n }));
   wHoli = !!(item && item.holiday); paintHoli();
   wRange = !!(item && item.range);
   document.getElementById('rFrom').value = item && item.range ? item.range.from : '';
@@ -2329,7 +2331,7 @@ document.getElementById('wFile').onchange = async e => {
   const btn = document.getElementById('pickBtn');
   btn.disabled = true;
   for(const f of [...e.target.files].slice(0, MAX_PICS - pics.length)){
-    try{ pics.push(await compress(f, 48000, THUMB_MAX)); picFiles.push(f); }
+    try{ pics.push(await compress(f, 48000, THUMB_MAX)); picFiles.push({ file: f }); }
     catch{ toast('사진 하나를 못 읽었어요'); }
   }
   pics = await fitBudget(pics, picFiles);
@@ -2397,18 +2399,26 @@ async function fitBudget(list, files){
 /* ═══ 확대용 원본급 사진 (한 장 = 한 칸) ═══ */
 async function savePhotos(noticeId){
   if(!picFiles.length) return;
-  // 기존 사진을 남겨둔 채 일부만 추가한 경우엔 원본을 건드리지 않음
-  if(picFiles.length !== pics.length) return;
-  const many = picFiles.length;
+  const isNew = picFiles.some(p => p && p.file);
+  const many = picFiles.filter(p => p && p.file).length;
   if(many > 2) toast(`사진 저장 중… (${many}장)`, 4000);
+
+  // 기존에 저장된 큰 사진을 먼저 읽어둠 (자리만 바뀐 경우 그대로 옮김)
+  let keep = [];
   try{
-    // 이 공지의 기존 큰 사진은 정리
-    const old = await getDocs(query(PHOTOS, where('n','==',noticeId)));
-    old.forEach(d => deleteDoc(d.ref).catch(()=>{}));
+    const snap = await getDocs(query(PHOTOS, where('n','==',noticeId)));
+    snap.forEach(d => { const v = d.data(); if(v.d) keep[v.i || 0] = v.d; });
+    if(isNew) snap.forEach(d => deleteDoc(d.ref).catch(()=>{}));
   }catch{}
+  if(!isNew) return;                     // 사진 구성이 그대로면 손대지 않음
+
   for(let n = 0; n < picFiles.length; n++){
+    const p = picFiles[n];
     try{
-      const big = await compress(picFiles[n], HI_TARGET, HI_MAX);
+      let big = null;
+      if(p && p.file) big = await compress(p.file, HI_TARGET, HI_MAX);
+      else if(p && typeof p.old === 'number') big = keep[p.old] || null;   // 기존 것 그대로
+      if(!big) continue;
       await addDoc(PHOTOS, { n: noticeId, i: n, d: big, at: serverTimestamp() });
     }catch{}
   }
@@ -2427,8 +2437,6 @@ document.getElementById('saveBtn').onclick = async () => {
   const title = document.getElementById('wTitle').value.trim();
   if(!title){ toast('제목을 입력해 주세요'); return; }
   // 저장 용량 한도(1MB) 사전 검사 — 넘으면 저장 자체가 실패하므로 미리 안내
-  if(editId && picFiles.length && picFiles.length !== pics.length)
-    toast('기존 사진은 그대로 두고 저장해요', 3000);
   const size = pics.reduce((a,s) => a + s.length, 0);
   if(size > 780000){
     note('사진이 너무 많아요', '사진을 몇 장 빼면 올릴 수 있어요.');
