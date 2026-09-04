@@ -1,6 +1,6 @@
 // ── 3반 알리미 서비스워커 (캐시 + 푸시 알림) ──
 // 앱을 수정하면 아래 숫자를 v11, v12... 로 올리세요
-const CACHE = 'banner-v106';
+const CACHE = 'banner-v107';
 const ASSETS = ['./', './index.html', './manifest.json',
                 './icon-192.png', './icon-512.png', './icon-splash.png',
                 './favicon-light.png', './favicon-dark.png', './badge.png'];
@@ -40,11 +40,13 @@ messaging.onBackgroundMessage(payload => {
 // 알림 누르면 앱 열기 (이미 열려 있으면 그 창으로)
 self.addEventListener('notificationclick', e => {
   e.notification.close();
-  const target = (e.notification.data && e.notification.data.url) || './';
   e.waitUntil(
     clients.matchAll({ type:'window', includeUncontrolled:true }).then(list => {
-      for(const c of list){ if('focus' in c) return c.focus(); }
-      if(clients.openWindow) return clients.openWindow(target);
+      // 이미 열려 있으면 그 창에 '새 알림 열기' 신호를 보냄
+      for(const c of list){
+        if('focus' in c){ c.postMessage({ type:'OPEN_NEWS' }); return c.focus(); }
+      }
+      if(clients.openWindow) return clients.openWindow('./?new=1');
     })
   );
 });

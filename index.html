@@ -717,6 +717,14 @@ html.booting .fab{visibility:hidden}
   <div id="mealBody"></div>
 </section>
 
+<section class="sheet" id="news">
+  <div class="sheettop">
+    <button class="xbtn" onclick="closeSheet('news')">← 닫기</button>
+    <span class="stitle">새 알림</span>
+  </div>
+  <div id="newsBody"></div>
+</section>
+
 <section class="sheet" id="timetable">
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('timetable')">← 닫기</button>
@@ -745,6 +753,8 @@ html.booting .fab{visibility:hidden}
     <button class="xbtn" onclick="closeSheet('menu')">← 닫기</button>
     <span class="stitle">메뉴</span>
   </div>
+  <div class="mrow2"><span>새 알림 모아보기<br><small class="hint" style="margin:4px 0 0;display:block">아직 확인하지 않은 공지를 마감 순으로 보여줘요</small></span>
+    <button class="hbtn ghost" id="newsBtn">열기</button></div>
   <div class="mrow2"><span>새 공지 알림<br><small id="bellHint" class="hint" style="margin:4px 0 0;display:block">켜두면 새 공지와 마감 임박을 알려드려요</small></span>
     <button class="iconbtn" id="bellBtn" aria-label="알림" aria-pressed="false"></button></div>
   <div class="mrow2"><span>화면 모드</span>
@@ -772,7 +782,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v105</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v106</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -2703,6 +2713,42 @@ function showFiles(i){
       note('파일을 받지 못했어요', '업로드가 중간에 끊겼을 수 있어요.\n관리자에게 다시 올려달라고 알려주세요.');
     }
     nameEl.textContent = keep;
+  });
+}
+
+/* ═══ 새 알림 모아보기 ═══ */
+// 아직 열어보지 않은 공지 (학사일정 제외), 마감이 가까운 순
+function unreadList(){
+  return expand()
+    .filter(e => !e.item.readonly && !localStorage.getItem('read_' + e.item.id))
+    .filter(e => !e.date || dday(e.date) >= 0)
+    .sort((a,b) => {
+      const A = a.date ? dday(a.date) : 9999, B = b.date ? dday(b.date) : 9999;
+      return A - B;
+    });
+}
+
+function openNews(){
+  const list = unreadList();
+  document.getElementById('newsBody').innerHTML = list.length
+    ? list.map(e => rowHTML(e, false)).join('')
+    : '<div class="empty"><b>새 알림이 없어요</b>확인하지 않은 공지가 모두 정리됐어요</div>';
+  document.querySelectorAll('#newsBody .row').forEach(r => r.onclick = () => {
+    openDetail(r.dataset.id);
+  });
+  openSheet('news');
+}
+
+document.getElementById('newsBtn').onclick = openNews;
+
+// 알림을 눌러 들어온 경우 바로 열기
+if(new URLSearchParams(location.search).get('new') === '1'){
+  addEventListener('load', () => setTimeout(openNews, 700));
+  history.replaceState({ root:1 }, '', location.pathname);
+}
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.addEventListener('message', e => {
+    if(e.data && e.data.type === 'OPEN_NEWS') openNews();
   });
 }
 
