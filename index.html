@@ -281,6 +281,15 @@ html.booting .fab{visibility:hidden}
   background:var(--rule);color:var(--dim);margin-right:6px;vertical-align:2px}
 .gradechip.mine{background:#4b7bd6;color:#fff}
 
+/* 새 알림 카드 */
+.newscard{display:flex;align-items:center;gap:11px;margin:14px 0 0;padding:14px 16px;
+  border:1.5px solid var(--rule);border-radius:12px;background:var(--soft);cursor:pointer;width:100%}
+.newscard:active{opacity:.7}
+.newscard .nt{flex:1;text-align:left;font-size:14.5px;font-weight:800;letter-spacing:-.03em}
+.newscard .nb{background:var(--urgent);color:#fff;border-radius:999px;min-width:22px;height:22px;
+  padding:0 7px;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:900;flex-shrink:0}
+
 /* 즉시 공지 배너 */
 .flash{display:flex;align-items:center;gap:10px;margin:14px 0 0;padding:12px 14px;
   border-radius:12px;cursor:pointer;overflow:hidden;
@@ -547,6 +556,7 @@ html.booting .fab{visibility:hidden}
 </header>
 
 <main>
+  <div id="newsCard"></div>
   <div id="flashBox"></div>
   <div id="topCards"></div>
   <div id="weekBox" hidden></div>
@@ -782,7 +792,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v106</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v107</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1054,6 +1064,7 @@ function render(){
 
   renderUrgent(all);
   renderWeek(all);
+  renderNewsCard();
 
   const isLive = e => e.item.pin || !e.date || dday(e.date) >= 0;
   const live = pool.filter(isLive).sort((a,b) =>
@@ -1251,6 +1262,8 @@ window.openDetail = id => {
   current = i;
   const imgs = (i.images||[]).map((s,n)=>`<img src="${s}" alt="사진 ${n+1}">`).join('');
   if(!i.readonly && !localStorage.getItem('read_'+i.id)){
+    localStorage.setItem('read_'+i.id, '1');
+    setTimeout(renderNewsCard, 0);
     setDoc(doc(db,'reads', `${i.id}_${devId}`), { n:i.id, at:serverTimestamp() })
       .then(() => localStorage.setItem('read_'+i.id, '1')).catch(()=>{});
   }
@@ -1856,6 +1869,7 @@ async function subscribe(silent){
       if(!token) throw new Error('토큰이 비어 있음');
       await setDoc(doc(db,'tokens',token), {
         createdAt: serverTimestamp(),
+        admin: !!isAdmin,                    // 건의 알림은 관리자 기기에만
         ua: navigator.userAgent.slice(0,120)
       });
       localStorage.setItem('fcmToken', token);
@@ -1969,6 +1983,10 @@ document.getElementById('rSend').onclick = async () => {
       text, images: rPics, createdAt: serverTimestamp()
     });
     closeSheet('report'); toast('보냈어요. 고마워요!');
+    fetch(PUSH_URL, {                        // 관리자에게만 도착 알림
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ report:true })
+    }).catch(()=>{});
   }catch{ toast('전송에 실패했어요. 사진을 빼고 다시 시도해 보세요'); }
   btn.disabled = false; btn.textContent = '보내기';
 };
@@ -2058,6 +2076,8 @@ onAuthStateChanged(auth, user => {
   isMain = myUid === MAIN_UID;
   document.getElementById('fab').classList.toggle('on', isAdmin);
   document.getElementById('flashRow').hidden = !isAdmin;
+  const tk = localStorage.getItem('fcmToken');
+  if(tk) setDoc(doc(db,'tokens',tk), { admin: !!isAdmin }, { merge:true }).catch(()=>{});
   document.getElementById('gearRow').hidden = !isMain;
   document.getElementById('backupRow').hidden = !isMain;
 
@@ -2726,6 +2746,21 @@ function unreadList(){
       const A = a.date ? dday(a.date) : 9999, B = b.date ? dday(b.date) : 9999;
       return A - B;
     });
+}
+
+// 메인 화면 맨 위 카드 (안 읽은 개수 표시)
+function renderNewsCard(){
+  const box = document.getElementById('newsCard');
+  if(!box) return;
+  const n = unreadList().length;
+  box.innerHTML = n
+    ? `<button class="newscard" id="newsCardBtn">
+         <span class="nt">확인하지 않은 공지</span>
+         <span class="nb">${n > 99 ? '99+' : n}</span>
+       </button>`
+    : '';
+  const b = document.getElementById('newsCardBtn');
+  if(b) b.onclick = openNews;
 }
 
 function openNews(){
