@@ -281,6 +281,20 @@ html.booting .fab{visibility:hidden}
   background:var(--rule);color:var(--dim);margin-right:6px;vertical-align:2px}
 .gradechip.mine{background:#4b7bd6;color:#fff}
 
+/* 주간 시간표 표 */
+.ttwrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tt{border-collapse:separate;border-spacing:0;width:100%;min-width:330px;table-layout:fixed}
+.tt th,.tt td{border-bottom:1px solid var(--rule);padding:9px 4px;text-align:center;
+  font-size:12.5px;font-weight:700;letter-spacing:-.04em;word-break:keep-all;line-height:1.3}
+.tt th{font-size:12px;font-weight:900;color:var(--dim);padding-bottom:11px;
+  border-bottom:1.5px solid var(--ink)}
+.tt .pcol{width:34px;color:var(--dimmer);font-weight:800;font-size:11.5px}
+.tt th.today{color:var(--ink)}
+.tt td.today, .tt th.today{background:var(--soft)}
+.tt td.changed{color:var(--urgent);font-weight:900}
+.tt td.changed::after{content:'•';font-size:11px;vertical-align:2px;margin-left:2px}
+.ttnote{font-size:11.5px;font-weight:700;color:var(--dimmer);margin:14px 0 0;line-height:1.6}
+
 /* 새 알림 카드 */
 .newscard{display:flex;align-items:center;gap:11px;margin:14px 0 0;padding:14px 16px;
   border:1.5px solid var(--rule);border-radius:12px;background:var(--soft);cursor:pointer;width:100%}
@@ -792,7 +806,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v107</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v108</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -2599,13 +2613,7 @@ function openTop(kind){
     openSheet('meal'); return;
   }
   if(kind === 'timetable'){
-    const days = [...new Set(timetable.map(t => t.date))];
-    document.getElementById('ttBody').innerHTML = days.map(d => `
-      <div class="mealday${d===key?' today':''}">
-        <b>${fmtYmd(d)}${d===key?' · 오늘':''}</b>
-        <p>${timetable.filter(t => t.date === d)
-              .map(t => `${t.period}교시 ${esc(t.subject)}`).join('  ·  ')}</p>
-      </div>`).join('') || '<div class="empty">시간표 정보가 없어요</div>';
+    document.getElementById('ttBody').innerHTML = timetableHTML();
     openSheet('timetable'); return;
   }
   // 명언
@@ -2919,6 +2927,46 @@ document.getElementById('qSave').onclick = async () => {
   }catch{ toast('저장에 실패했어요'); }
   btn.disabled = false; btn.textContent = '등록';
 };
+
+// 요일 × 교시 표로 그리기
+function timetableHTML(){
+  if(!timetable.length) return '<div class="empty">시간표 정보가 없어요</div>';
+
+  const days = [...new Set(timetable.map(t => t.date))].sort();
+  const maxP = Math.max(...timetable.map(t => t.period));
+  const key = plain(TODAY);
+  const dayName = s => ['일','월','화','수','목','금','토'][
+    new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T00:00:00`).getDay()];
+
+  // 지난번에 받아둔 시간표와 비교해 바뀐 칸 표시
+  let prev = {};
+  try{ prev = JSON.parse(localStorage.getItem('ttPrev') || '{}'); }catch{}
+  const now = {};
+  timetable.forEach(t => { now[t.date + '_' + t.period] = t.subject; });
+
+  let changed = 0;
+  const cell = (d, p) => {
+    const k = d + '_' + p;
+    const s = now[k] || '';
+    const was = prev[k];
+    const diff = was !== undefined && was !== s && s;
+    if(diff) changed++;
+    return `<td class="${d===key?'today ':''}${diff?'changed':''}">${esc(s)}</td>`;
+  };
+
+  const head = `<tr><th class="pcol"></th>${days.map(d =>
+    `<th class="${d===key?'today':''}">${dayName(d)}<br>${+d.slice(6,8)}</th>`).join('')}</tr>`;
+  const rows = [...Array(maxP)].map((_, n) => {
+    const p = n + 1;
+    return `<tr><td class="pcol">${p}</td>${days.map(d => cell(d, p)).join('')}</tr>`;
+  }).join('');
+
+  localStorage.setItem('ttPrev', JSON.stringify(now));   // 다음 비교용으로 저장
+
+  return `<div class="ttwrap"><table class="tt">${head}${rows}</table></div>
+    <p class="ttnote">회색 칸이 오늘이에요.${
+      changed ? ' 빨간 글씨는 지난번과 달라진 수업이에요.' : ''}</p>`;
+}
 
 async function loadTimetable(){
   const from = new Date(TODAY), to = new Date(TODAY);
