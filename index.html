@@ -744,7 +744,9 @@ html.booting .fab{visibility:hidden}
 <section class="sheet" id="news">
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('news')">← 닫기</button>
-    <span class="stitle">새 알림</span>
+    <div class="topacts">
+      <button id="readAll" hidden>모두 읽음</button>
+    </div>
   </div>
   <div id="newsBody"></div>
 </section>
@@ -806,7 +808,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v108</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v110</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -924,6 +926,7 @@ const isNew = e => {
   return t > (seenAt[e.item.cat] || 0);
 };
 let schedule = [], meals = [], timetable = [], quote = null, wHoli = false;
+let ttBase = {};                 // 요일·교시별 기본 과목 (여러 주에서 자동 산출)
 let opts = [], wMode = 'open', wRange = false;   // 투표 선택지 / 번호 방식 / 기간 모드
 // 우리 반 번호: 1~35 (7번 없음)
 const NUMS = Array.from({length:35}, (_,n) => n+1).filter(n => n !== 7);
@@ -2771,16 +2774,33 @@ function renderNewsCard(){
   if(b) b.onclick = openNews;
 }
 
-function openNews(){
+function drawNews(){
   const list = unreadList();
+  document.getElementById('readAll').hidden = !list.length;
   document.getElementById('newsBody').innerHTML = list.length
     ? list.map(e => rowHTML(e, false)).join('')
     : '<div class="empty"><b>새 알림이 없어요</b>확인하지 않은 공지가 모두 정리됐어요</div>';
   document.querySelectorAll('#newsBody .row').forEach(r => r.onclick = () => {
     openDetail(r.dataset.id);
   });
-  openSheet('news');
 }
+
+function openNews(){ drawNews(); openSheet('news'); }
+
+// 남은 알림을 한 번에 정리
+document.getElementById('readAll').onclick = async () => {
+  const list = unreadList();
+  if(!list.length) return;
+  if(!await ask('모두 읽음으로 표시할까요?',
+    `${list.length}건이 새 알림에서 사라져요.\n공지는 목록에 그대로 남아요.`, '표시')) return;
+
+  [...new Set(list.map(e => e.item.id))].forEach(id => {
+    localStorage.setItem('read_' + id, '1');
+    setDoc(doc(db,'reads', `${id}_${devId}`), { n:id, at:serverTimestamp() }).catch(()=>{});
+  });
+  drawNews(); renderNewsCard();
+  toast('모두 읽음으로 표시했어요');
+};
 
 document.getElementById('newsBtn').onclick = openNews;
 
@@ -2938,18 +2958,16 @@ function timetableHTML(){
   const dayName = s => ['일','월','화','수','목','금','토'][
     new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T00:00:00`).getDay()];
 
-  // 지난번에 받아둔 시간표와 비교해 바뀐 칸 표시
-  let prev = {};
-  try{ prev = JSON.parse(localStorage.getItem('ttPrev') || '{}'); }catch{}
   const now = {};
   timetable.forEach(t => { now[t.date + '_' + t.period] = t.subject; });
+  const wd = s => new Date(`${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}T00:00:00`).getDay();
 
   let changed = 0;
   const cell = (d, p) => {
-    const k = d + '_' + p;
-    const s = now[k] || '';
-    const was = prev[k];
-    const diff = was !== undefined && was !== s && s;
+    const s = now[d + '_' + p] || '';
+    const base = ttBase[wd(d) + '_' + p];
+    // 기본과 다르면 강조. 창체 시간에 구체적인 활동이 들어와도 강조됨
+    const diff = !!s && !!base && norm(s) !== base;
     if(diff) changed++;
     return `<td class="${d===key?'today ':''}${diff?'changed':''}">${esc(s)}</td>`;
   };
@@ -2961,25 +2979,48 @@ function timetableHTML(){
     return `<tr><td class="pcol">${p}</td>${days.map(d => cell(d, p)).join('')}</tr>`;
   }).join('');
 
-  localStorage.setItem('ttPrev', JSON.stringify(now));   // 다음 비교용으로 저장
-
-  return `<div class="ttwrap"><table class="tt">${head}${rows}</table></div>
-    <p class="ttnote">회색 칸이 오늘이에요.${
-      changed ? ' 빨간 글씨는 지난번과 달라진 수업이에요.' : ''}</p>`;
+  return `<div class="ttwrap"><table class="tt">${head}${rows}</table></div>${
+    changed ? '<p class="ttnote">빨간 글씨는 평소와 다른 수업이에요.</p>' : ''}`;
 }
+
+// 창의적 체험활동 계열은 하나로 묶어서 기준을 잡음
+const CCA = /창의적|자율|자치|동아리|진로활동/;
+const norm = s => CCA.test(s) ? '창체' : s;
 
 async function loadTimetable(){
   const from = new Date(TODAY), to = new Date(TODAY);
-  to.setDate(to.getDate() + 6);
+  from.setDate(from.getDate() - 28);           // 지난 4주까지 함께 받아 기본표 산출
+  to.setDate(to.getDate() + 7);
   try{
     const r = await fetch(`${NEIS_URL}timetable?from=${plain(from)}&to=${plain(to)}&grade=1&class=3`);
     const d = await r.json();
-    const list = (d.list || []).filter(t => {
-      if(/휴업|방학/.test(t.subject)) return false;
+    const all = (d.list || []).filter(t => {
+      if(!t.subject || /휴업|방학/.test(t.subject)) return false;
       const w = new Date(`${t.date.slice(0,4)}-${t.date.slice(4,6)}-${t.date.slice(6,8)}T00:00:00`).getDay();
-      return w !== 0 && w !== 6;                 // 주말 제외
+      return w !== 0 && w !== 6;
     });
-    timetable = list;
+
+    // 요일·교시마다 가장 자주 나온 과목을 기본으로
+    const tally = {};
+    all.forEach(t => {
+      const w = new Date(`${t.date.slice(0,4)}-${t.date.slice(4,6)}-${t.date.slice(6,8)}T00:00:00`).getDay();
+      const k = w + '_' + t.period;
+      (tally[k] = tally[k] || {});
+      const s = norm(t.subject);
+      tally[k][s] = (tally[k][s] || 0) + 1;
+    });
+    ttBase = {};
+    Object.keys(tally).forEach(k => {
+      const e = Object.entries(tally[k]).sort((a,b) => b[1] - a[1]);
+      const total = e.reduce((a,b) => a + b[1], 0);
+      // 3주 이상 관찰됐고 과반이어야 기준으로 인정 (애매하면 강조하지 않음)
+      if(total >= 3 && e[0][1] * 2 > total) ttBase[k] = e[0][0];
+    });
+
+    // 화면에는 이번 주(오늘부터 7일)만 표시
+    const start = plain(TODAY);
+    const end = plain(new Date(TODAY.getTime() + 6*86400000));
+    timetable = all.filter(t => t.date >= start && t.date <= end);
     saveCache(); renderTop();
   }catch{}
 }
@@ -3036,6 +3077,7 @@ addEventListener('load', () => { loadMeals(); loadSchedule(); loadTimetable(); }
 document.addEventListener('visibilitychange', () => {
   if(document.hidden) return;
   refreshNotices();                       // 최신 공지 다시 확인
+  loadTimetable();                        // 시간표 변경도 바로 반영
   const now = midnight(new Date());
   if(now.getTime() !== TODAY.getTime()){
     TODAY = now;
