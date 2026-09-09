@@ -808,7 +808,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v110</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v111</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1737,6 +1737,10 @@ function hideSheet(id){
 }
 window.openSheet = id => {
   const el = document.getElementById(id);
+  if(el.classList.contains('on')){          // 이미 열려 있으면 앞으로만 올림
+    el.style.zIndex = ++sheetZ;
+    return;
+  }
   el.style.zIndex = ++sheetZ;
   el.classList.add('on');
   document.body.style.overflow = 'hidden';
@@ -2804,14 +2808,22 @@ document.getElementById('readAll').onclick = async () => {
 
 document.getElementById('newsBtn').onclick = openNews;
 
-// 알림을 눌러 들어온 경우 바로 열기
+// 알림을 눌러 들어온 경우 바로 열기 (중복 실행 방지)
+let newsOpened = false;
+function openNewsOnce(){
+  if(newsOpened) return;
+  newsOpened = true;
+  openNews();
+  setTimeout(() => newsOpened = false, 1500);
+}
+
 if(new URLSearchParams(location.search).get('new') === '1'){
-  addEventListener('load', () => setTimeout(openNews, 700));
   history.replaceState({ root:1 }, '', location.pathname);
+  addEventListener('load', () => setTimeout(openNewsOnce, 600));
 }
 if('serviceWorker' in navigator){
   navigator.serviceWorker.addEventListener('message', e => {
-    if(e.data && e.data.type === 'OPEN_NEWS') openNews();
+    if(e.data && e.data.type === 'OPEN_NEWS') openNewsOnce();
   });
 }
 
