@@ -808,7 +808,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v112</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v113</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1673,11 +1673,27 @@ document.getElementById('lbSave').onclick = async e => {
     (lbList.length > 1 ? `_${lbIdx+1}` : '') + '.jpg';
   try{
     const blob = await (await fetch(src)).blob();
+
+    // 아이폰은 내려받기로 사진 앱에 들어가지 않으므로 공유창을 띄움
+    const file = new File([blob], name, { type: blob.type || 'image/jpeg' });
+    if(isIOS && navigator.canShare && navigator.canShare({ files:[file] })){
+      try{
+        await navigator.share({ files:[file] });
+        sv.dataset.busy = '0'; sv.textContent = '사진 저장';
+        return;                                  // 공유창에서 '이미지 저장' 선택
+      }catch(err){
+        if(err && err.name === 'AbortError'){     // 사용자가 닫은 경우
+          sv.dataset.busy = '0'; sv.textContent = '사진 저장';
+          return;
+        }
+      }
+    }
+
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = name;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),3000);
-    toast(isIOS ? '안 되면 사진을 길게 눌러 저장하세요' : '사진을 저장했어요');
+    toast(isIOS ? '사진을 길게 눌러 저장할 수도 있어요' : '사진을 저장했어요');
   }catch{ toast('사진을 길게 눌러 저장해 주세요'); }
 };
 
