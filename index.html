@@ -301,6 +301,15 @@ html.booting .fab{visibility:hidden}
   line-height:1.6;letter-spacing:-.02em;white-space:pre-wrap;overflow-wrap:anywhere}
 .aimsg.me{align-self:flex-end;background:var(--ink);color:var(--paper)}
 .aimsg.bot{align-self:flex-start;border:1.5px solid var(--rule);background:var(--soft)}
+.ailog.picking .aimsg{cursor:pointer}
+.ailog.picking .aimsg[data-id]{opacity:.55}
+.ailog.picking .aimsg.sel{opacity:1;outline:2.5px solid var(--urgent);outline-offset:2px}
+.ailog.picking .aisrc button{pointer-events:none}
+.aipick{display:flex;gap:8px;max-width:720px;margin:0 auto}
+.aipick[hidden]{display:none}
+.aipick .hbtn{flex:1;padding:12px 0}
+.aipick .hbtn:disabled{opacity:.4}
+.aibar.picking .row2,.aibar.picking p{display:none}
 .ainote{font-size:11.5px;font-weight:700;color:var(--dimmer);line-height:1.6;margin:-12px 0 18px;word-break:keep-all}
 .aisrc{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
 .aisrc button{border:1.5px solid var(--rule);background:transparent;border-radius:999px;
@@ -772,11 +781,15 @@ html.booting .fab{visibility:hidden}
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('ai')">← 닫기</button>
     <span class="stitle">AI 도우미</span>
-    <button class="xbtn" id="aiClear" style="font-size:13px">대화 지우기</button>
+    <button class="xbtn" id="aiClear" style="font-size:13px">선택 삭제</button>
   </div>
   <p class="ainote">대화는 이 기기에 최근 40개까지 저장돼요. 40개를 넘으면 가장 오래된 대화부터 자동으로 지워져요.</p>
   <div class="ailog" id="aiLog"></div>
   <div class="aibar">
+    <div class="aipick" id="aiPick" hidden>
+      <button class="hbtn ghost" id="aiPickAll">전체 선택</button>
+      <button class="hbtn" id="aiPickDel" disabled>삭제</button>
+    </div>
     <div class="row2">
       <input type="text" id="aiInp" maxlength="200" autocomplete="off" placeholder="예) 이번 주 수행평가 뭐 있어?">
       <button class="hbtn" id="aiSend">보내기</button>
@@ -854,7 +867,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v119</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v120</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -2824,12 +2837,22 @@ function paintAiRow(){
 
 // 대화 기록 — 이 기기에만 저장 (최근 40개)
 const AI_KEY = 'ai_chat';
-const aiLoad = () => { try{ const a = JSON.parse(localStorage.getItem(AI_KEY) || '[]'); return Array.isArray(a) ? a : []; }catch{ return []; } };
+const aiNewId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const aiLoad = () => {
+  try{
+    const a = JSON.parse(localStorage.getItem(AI_KEY) || '[]');
+    if(!Array.isArray(a)) return [];
+    a.forEach(m => { if(!m.i) m.i = aiNewId(); });      // 예전에 저장된 대화에도 번호를 붙임
+    return a;
+  }catch{ return []; }
+};
+const aiStore = list => { try{ localStorage.setItem(AI_KEY, JSON.stringify(list.slice(-AI_MAX))); }catch{} };
 const AI_MAX = 40;
 let aiWarned = false;
 const aiSave = (c, t, s) => {
+  const i = aiNewId();
   try{
-    const all = [...aiLoad(), { c, t, s: s || [] }];
+    const all = [...aiLoad(), { i, c, t, s: s || [] }];
     localStorage.setItem(AI_KEY, JSON.stringify(all.slice(-AI_MAX)));
     // 40개에 가까워지면 한 번만 미리 알림
     if(!aiWarned && all.length >= AI_MAX - 4 && c === 'bot'){
@@ -2839,12 +2862,14 @@ const aiSave = (c, t, s) => {
         : `저장된 대화가 ${all.length}개예요. 40개를 넘으면 가장 오래된 대화부터 지워져요`, 3600);
     }
   }catch{}
+  return i;
 };
 
-function aiAdd(cls, text, sources){
+function aiAdd(cls, text, sources, id){
   const log = document.getElementById('aiLog');
   const el = document.createElement('div');
   el.className = 'aimsg ' + cls;
+  if(id) el.dataset.id = id;                     // 번호가 있는 말풍선만 선택·삭제 가능
   el.textContent = text;
   const src = (sources || []).map(id => items.find(i => i.id === id)).filter(Boolean);
   if(src.length){
@@ -2866,22 +2891,64 @@ const AI_HELLO = '무엇이든 물어보세요.\n예) 이번 주 수행평가 �
 function openAi(){
   const log = document.getElementById('aiLog');
   if(!log.children.length){                       // 처음 열 때 저장된 대화를 되살림
+    const saved = aiLoad();
+    aiStore(saved);                               // 새로 붙인 번호를 저장
     aiAdd('bot', AI_HELLO);
-    aiLoad().forEach(m => aiAdd(m.c === 'me' ? 'me' : 'bot', String(m.t || ''), m.s));
+    saved.forEach(m => aiAdd(m.c === 'me' ? 'me' : 'bot', String(m.t || ''), m.s, m.i));
   }
+  aiPick(false);
   openSheet('ai');
   requestAnimationFrame(() => { if(log.lastElementChild) log.lastElementChild.scrollIntoView({ block:'end' }); });
 }
 document.getElementById('aiBtn').onclick = openAi;
 document.getElementById('aiFab').onclick = openAi;
-document.getElementById('aiClear').onclick = async () => {
-  if(aiBusy) return;
-  if(!aiLoad().length) return toast('지울 대화가 없어요');
-  if(!await ask('대화를 모두 지울까요?', '이 기기에 저장된 AI 대화만 지워져요.', '지우기', true)) return;
-  try{ localStorage.removeItem(AI_KEY); }catch{}
+
+// 선택 삭제 — 말풍선을 눌러 고른 뒤 지움
+let aiPicking = false;
+function aiPickCount(){
+  const n = document.querySelectorAll('#aiLog .aimsg.sel').length;
+  const total = document.querySelectorAll('#aiLog .aimsg[data-id]').length;
+  const del = document.getElementById('aiPickDel');
+  del.textContent = n ? `삭제 (${n})` : '삭제';
+  del.disabled = !n;
+  document.getElementById('aiPickAll').textContent = n && n === total ? '선택 해제' : '전체 선택';
+}
+function aiPick(on){
+  aiPicking = on;
+  document.getElementById('aiLog').classList.toggle('picking', on);
+  document.querySelector('#ai .aibar').classList.toggle('picking', on);
+  document.getElementById('aiPick').hidden = !on;
+  document.getElementById('aiClear').textContent = on ? '취소' : '선택 삭제';
+  if(!on) document.querySelectorAll('#aiLog .aimsg.sel').forEach(el => el.classList.remove('sel'));
+  aiPickCount();
+}
+document.getElementById('aiClear').onclick = () => {
+  if(aiBusy) return toast('답을 기다리는 중이에요');
+  if(!aiPicking && !document.querySelector('#aiLog .aimsg[data-id]')) return toast('지울 대화가 없어요');
+  aiPick(!aiPicking);
+};
+document.getElementById('aiLog').addEventListener('click', e => {
+  if(!aiPicking) return;
+  e.stopPropagation(); e.preventDefault();
+  const el = e.target.closest('.aimsg[data-id]');
+  if(el){ el.classList.toggle('sel'); aiPickCount(); }
+}, true);
+document.getElementById('aiPickAll').onclick = () => {
+  const all = [...document.querySelectorAll('#aiLog .aimsg[data-id]')];
+  const every = all.length && all.every(el => el.classList.contains('sel'));
+  all.forEach(el => el.classList.toggle('sel', !every));
+  aiPickCount();
+};
+document.getElementById('aiPickDel').onclick = async () => {
+  const sel = [...document.querySelectorAll('#aiLog .aimsg.sel')];
+  if(!sel.length) return;
+  if(!await ask(`선택한 대화 ${sel.length}개를 지울까요?`, '지운 대화는 되돌릴 수 없어요.', '지우기', true)) return;
+  const ids = new Set(sel.map(el => el.dataset.id));
+  aiStore(aiLoad().filter(m => !ids.has(m.i)));
+  sel.forEach(el => el.remove());
   aiWarned = false;
-  document.getElementById('aiLog').innerHTML = '';
-  aiAdd('bot', AI_HELLO);
+  aiPick(false);
+  toast(`${ids.size}개를 지웠어요`);
 };
 
 let aiBusy = false;
@@ -2890,7 +2957,8 @@ async function aiAsk(){
   const q = inp.value.trim();
   if(!q || aiBusy) return;
   inp.value = ''; btn.disabled = true; aiBusy = true;
-  aiAdd('me', q); aiSave('me', q);
+  if(aiPicking) aiPick(false);
+  aiAdd('me', q, null, aiSave('me', q));
   const wait = aiAdd('bot', '답변을 찾는 중…');
   try{
     const ctrl = new AbortController();
@@ -2906,14 +2974,13 @@ async function aiAsk(){
     // 별표·샵 같은 꾸밈 기호는 지우고 보여줌
     const clean = String(d.answer || '').replace(/\*\*/g, '').replace(/^#+\s*/gm, '').replace(/^\s*[*-]\s+/gm, '· ').trim();
     const text = d.ok ? (clean || '답을 만들지 못했어요. 질문을 조금 바꿔서 다시 물어봐 주세요.') : (d.error || '답변을 만들지 못했어요.');
-    aiAdd('bot', text, d.ok ? d.sources : null);
-    aiSave('bot', text, d.ok ? d.sources : null);
+    aiAdd('bot', text, d.ok ? d.sources : null, aiSave('bot', text, d.ok ? d.sources : null));
   }catch(e){
     wait.remove();
     const text = e && e.name === 'AbortError'
       ? '답이 너무 오래 걸려서 멈췄어요. 질문을 조금 짧게 다시 해 주세요.'
       : '연결하지 못했어요. 잠시 뒤 다시 시도해 주세요.';
-    aiAdd('bot', text); aiSave('bot', text);
+    aiAdd('bot', text, null, aiSave('bot', text));
   }
   btn.disabled = false; aiBusy = false;
   inp.focus();
