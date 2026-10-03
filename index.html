@@ -2802,7 +2802,7 @@ function showFiles(i){
 
 /* ═══ AI 도우미 ═══
    AI_MODE: 'off' = 숨김(배포용) · 'admin' = 총괄 관리자만(시험용) · 'all' = 전원 */
-const AI_MODE = 'off';
+const AI_MODE = 'admin';
 const aiVisible = () => AI_MODE === 'all' || (AI_MODE === 'admin' && isMain);
 function paintAiRow(){ document.getElementById('aiRow').hidden = !aiVisible(); }
 
