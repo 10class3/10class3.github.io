@@ -317,8 +317,6 @@ html.booting .fab{visibility:hidden}
 .aiask{position:relative}
 .ainew::after{content:'';position:absolute;top:-5px;right:-5px;width:13px;height:13px;border-radius:50%;
   background:var(--urgent);border:2.5px solid var(--paper)}
-.ainewrow > span::after{content:'';display:inline-block;width:8px;height:8px;border-radius:50%;
-  background:var(--urgent);margin-left:6px;vertical-align:8px}
 .aiask:active{opacity:.75}
 .aiask svg{width:22px;height:22px;flex:none}
 .aiask .aq{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
@@ -857,8 +855,6 @@ html.booting .fab{visibility:hidden}
     <button class="xbtn" onclick="closeSheet('menu')">← 닫기</button>
     <span class="stitle">메뉴</span>
   </div>
-  <div class="mrow2" id="aiRow" hidden><span>AI 도우미<br><small class="hint" style="margin:4px 0 0;display:block">공지 내용을 물어볼 수 있어요</small></span>
-    <button class="hbtn ghost" id="aiBtn">열기</button></div>
   <div class="mrow2"><span>새 알림 모아보기<br><small class="hint" style="margin:4px 0 0;display:block">아직 확인하지 않은 공지를 마감 순으로 보여줘요</small></span>
     <button class="hbtn ghost" id="newsBtn">열기</button></div>
   <div class="mrow2"><span>새 공지 알림<br><small id="bellHint" class="hint" style="margin:4px 0 0;display:block">켜두면 새 공지와 마감 임박을 알려드려요</small></span>
@@ -888,7 +884,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v124</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v125</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -2852,9 +2848,7 @@ function showFiles(i){
 const AI_MODE = 'all';
 const aiVisible = () => AI_MODE === 'all' || (AI_MODE === 'admin' && isMain);
 function paintAiRow(){
-  document.getElementById('aiRow').hidden = !aiVisible();
   document.getElementById('aiFab').classList.toggle('on', aiVisible());
-  document.getElementById('aiAsk').hidden = !aiVisible();
   aiDot();
   if(aiVisible()) aiIntro();
 }
@@ -2864,9 +2858,10 @@ function aiDot(){
   let opened = false;
   try{ opened = !!localStorage.getItem('ai_opened'); }catch{ opened = true; }
   const on = aiVisible() && !opened;
+  // 위쪽 안내 카드는 AI를 한 번 열면 사라지고, 그 뒤로는 오른쪽 아래 버튼만 남음
+  document.getElementById('aiAsk').hidden = !on;
   document.getElementById('aiAsk').classList.toggle('ainew', on);
   document.getElementById('aiFab').classList.toggle('ainew', on);
-  document.getElementById('aiRow').classList.toggle('ainewrow', on);
 }
 
 // 처음 한 번만 새 기능을 알려 줌 (다른 창이 떠 있으면 다음 기회로)
@@ -2880,7 +2875,7 @@ function aiIntro(){
     aiIntroBusy = false;
     if(document.querySelector('.sheet.on, .modal.on') || document.getElementById('boot')) return;
     try{ localStorage.setItem('ai_intro', '1'); }catch{}
-    if(await ask('AI 도우미가 생겼어요', '수행평가 날짜, 준비물처럼 공지에 있는 내용을 물어보면 바로 찾아서 알려 줘요. 화면 맨 위 "AI에게 물어보기"를 누르면 돼요.', '지금 써 보기'))
+    if(await ask('AI 도우미가 생겼어요', '수행평가 날짜, 준비물처럼 공지에 있는 내용을 물어보면 바로 찾아서 알려 줘요. 화면 오른쪽 아래 "AI에게 묻기" 버튼을 누르면 돼요.', '지금 써 보기'))
       openAi(true);
   }, 2600);
 }
@@ -2953,7 +2948,6 @@ function openAi(focus){
   requestAnimationFrame(() => { if(log.lastElementChild) log.lastElementChild.scrollIntoView({ block:'end' }); });
   if(focus === true) setTimeout(() => document.getElementById('aiInp').focus(), 250);
 }
-document.getElementById('aiBtn').onclick = () => openAi();
 document.getElementById('aiFab').onclick = () => openAi();
 document.getElementById('aiAsk').onclick = () => openAi(true);
 
