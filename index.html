@@ -305,6 +305,30 @@ html.booting .fab{visibility:hidden}
 .ailog.picking .aimsg[data-id]{opacity:.55}
 .ailog.picking .aimsg.sel{opacity:1;outline:2.5px solid var(--urgent);outline-offset:2px}
 .ailog.picking .aisrc button{pointer-events:none}
+.ocrtext{width:100%;min-height:46vh;padding:13px;border:1.5px solid var(--rule);border-radius:12px;background:var(--panel);
+  color:var(--ink);font-family:inherit;font-size:14px;font-weight:600;line-height:1.65;resize:vertical}
+.ocrview{margin:0 0 12px;padding:13px;border:1.5px solid var(--rule);border-radius:12px;background:var(--soft);
+  font-size:13.5px;font-weight:600;line-height:1.75;white-space:pre-wrap;overflow-wrap:anywhere;max-height:38vh;overflow-y:auto}
+.ocrview[hidden]{display:none}
+.ocrview mark{background:#ffd84a;color:#111;border-radius:3px;padding:0 2px}
+.ocrview .ovh{display:block;font-size:11.5px;font-weight:800;color:var(--dim);margin-bottom:8px;white-space:normal}
+.ocrview .ovm{display:block;margin-top:10px;padding-top:10px;border-top:1px dashed var(--rule);font-size:12px;color:var(--dim);white-space:normal}
+.ocrrow{display:flex;align-items:center;gap:10px;margin:14px 0 0;padding:12px 14px;border:1.5px dashed var(--rule);border-radius:12px;
+  font-size:12.5px;font-weight:700;color:var(--dim)}
+.ocrrow span{flex:1}
+.ocrrow button{flex:none;border:1.5px solid var(--ink);background:transparent;color:var(--ink);border-radius:999px;padding:6px 12px;
+  font-family:inherit;font-size:12px;font-weight:800;cursor:pointer}
+.aifocus{max-width:720px;margin:0 auto 9px}
+.aifocus[hidden]{display:none}
+.aiftop{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:var(--dim);margin-bottom:8px}
+.aiftop span{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aiftop button{flex:none;background:none;border:0;color:var(--dimmer);font-size:14px;cursor:pointer;padding:2px 4px}
+.aichips{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none}
+.aichips::-webkit-scrollbar{display:none}
+.aichips button{flex:none;border:1.5px solid var(--rule);background:var(--soft);color:var(--ink);border-radius:999px;
+  padding:7px 13px;font-family:inherit;font-size:12.5px;font-weight:800;cursor:pointer}
+.aibar.picking .aifocus{display:none}
+.ailog.focused{padding-bottom:230px}
 .aipick{display:flex;gap:8px;max-width:720px;margin:0 auto}
 .aipick[hidden]{display:none}
 .aipick .hbtn{flex:1;padding:12px 0}
@@ -645,6 +669,7 @@ html.booting .fab{visibility:hidden}
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('detail')">← 목록</button>
     <div class="topacts">
+      <button id="aiHereBtn" hidden>AI에게 묻기</button>
       <button id="calBtn">캘린더</button>
       <button id="shareBtn">공유</button>
       <button id="editBtn" hidden>수정</button>
@@ -796,6 +821,21 @@ html.booting .fab{visibility:hidden}
   <div id="mealBody"></div>
 </section>
 
+<section class="sheet" id="ocr">
+  <div class="sheettop">
+    <button class="xbtn" onclick="closeSheet('ocr')">← 닫기</button>
+    <span class="stitle">사진 속 글 (AI용)</span>
+  </div>
+  <p class="ainote" style="margin:-12px 0 14px">사진을 두 가지 방식(기기 인식 + AI)으로 읽어 비교한 글이에요. 노랗게 표시된 곳은 둘이 다르게 읽은 부분이니 원본과 비교해서 아래 칸에서 고친 뒤 저장하세요. 저장하면 AI 도우미가 본문과 함께 이 내용도 읽고 답해요. 친구들 화면에는 따로 보이지 않아요.</p>
+  <div id="ocrView" class="ocrview" hidden></div>
+  <textarea id="ocrText" class="ocrtext" maxlength="6000" placeholder="아래 'AI로 사진 읽기'를 누르거나, 사진 속 내용을 직접 적어도 돼요."></textarea>
+  <p class="ainote" id="ocrState" style="margin:8px 0 14px"></p>
+  <div class="row2" style="display:flex;gap:8px">
+    <button class="hbtn ghost" id="ocrRun" style="flex:1;padding:12px 0">AI로 사진 읽기</button>
+    <button class="hbtn" id="ocrSave" style="flex:1;padding:12px 0">저장</button>
+  </div>
+</section>
+
 <section class="sheet" id="ai">
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('ai')">← 닫기</button>
@@ -808,6 +848,15 @@ html.booting .fab{visibility:hidden}
     <div class="aipick" id="aiPick" hidden>
       <button class="hbtn ghost" id="aiPickAll">전체 선택</button>
       <button class="hbtn" id="aiPickDel" disabled>삭제</button>
+    </div>
+    <div class="aifocus" id="aiFocus" hidden>
+      <div class="aiftop"><span id="aiFocusT"></span><button id="aiFocusX" aria-label="공지 지정 풀기">✕</button></div>
+      <div class="aichips">
+        <button data-q="이 공지를 핵심만 정리해 줘">요약</button>
+        <button data-q="이 공지에서 내가 해야 할 일과 준비물을 정리해 줘">할 일·준비물</button>
+        <button data-q="이 공지의 날짜와 마감을 알려 줘">날짜·마감</button>
+        <button data-q="이 공지에서 놓치기 쉬운 주의사항을 알려 줘">주의사항</button>
+      </div>
     </div>
     <div class="row2">
       <input type="text" id="aiInp" maxlength="200" autocomplete="off" placeholder="예) 이번 주 수행평가 뭐 있어?">
@@ -884,7 +933,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v125</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v129</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1386,6 +1435,7 @@ window.openDetail = id => {
     ${sched}
     ${bodyHTML(i)}
     ${imgs?`<div class="dtl-imgs">${imgs}<p class="imgcap">사진을 누르면 크게 볼 수 있어요</p></div>`:''}
+    ${imgs && canEdit(i) ? `<div class="ocrrow"><span>${i.ocr ? (i.ocrAuto ? ((i.ocrMarks || []).length ? `AI가 사진 속 글을 읽어 뒀어요. 확인할 곳 ${i.ocrMarks.length}군데` : 'AI가 사진 속 글을 읽어 뒀어요. 두 방식의 결과가 같아요') : '사진 속 글이 저장돼 있어요 (확인 완료)') : '사진 속 글을 AI가 읽게 할 수 있어요'}</span><button id="ocrOpen">${i.ocr ? '보기·수정' : '읽히기'}</button></div>` : ''}
     <div id="fileView"></div>
     <div id="pollView"></div>
     <div class="dtl-foot"><span>${isMain && readMap[i.id] ? readMap[i.id]+"명 확인" : (i.authorName ? esc(i.authorName) : "3반 알리미")}</span><span>${i.updatedAt?'수정됨 · ':''}${i.createdAt?new Date(i.createdAt).toLocaleDateString('ko-KR')+' 등록':''}</span></div>`;
@@ -1399,10 +1449,13 @@ window.openDetail = id => {
         lbShow();
       }
     });
+  const oo = document.getElementById('ocrOpen');
+  if(oo) oo.onclick = () => openOcr(i);
   bindChecks(i);
   showFiles(i);
   showPoll(i);
   document.getElementById('calBtn').hidden = !(i.date || (i.sessions && i.sessions.length));
+  document.getElementById('aiHereBtn').hidden = !(aiVisible() && !i.readonly);
   document.getElementById('delBtn').hidden = !canEdit(i);
   document.getElementById('editBtn').hidden = !canEdit(i);
   openSheet('detail');
@@ -2625,16 +2678,23 @@ document.getElementById('saveBtn').onclick = async () => {
 
   const btn = document.getElementById('saveBtn');
   const label = btn.textContent;
+  // 사진이 새로 추가됐는지 (자동 읽기 대상), 기존에 읽어 둔 글이 있었는지
+  const picsNew = picFiles.some(p => p && p.file);
+  const hadOcr = !!(editId && (items.find(x => x.id === editId) || {}).ocr);
   btn.disabled = true; btn.textContent = '저장 중…';
   try{
     if(editId){
       await updateDoc(doc(db,'notices',editId), { ...payload, updatedAt: serverTimestamp() });
-      savePhotos(editId); saveFiles(editId);
+      const eid = editId, redo = picsNew || (!pics.length && hadOcr);
+      if(redo && !pics.length) updateDoc(doc(db,'notices',eid), { ocr: '', ocrAuto: false }).catch(() => {});
+      Promise.resolve(savePhotos(eid)).then(() => { if(picsNew) autoOcr(eid, payload.images); });
+      saveFiles(editId);
       if(wNoti) pushNotice(payload, true);
       toast('수정했어요');
     }else{
       const ref = await addDoc(COL, { ...payload, createdAt: serverTimestamp() });
-      savePhotos(ref.id); saveFiles(ref.id);
+      Promise.resolve(savePhotos(ref.id)).then(() => autoOcr(ref.id, payload.images));
+      saveFiles(ref.id);
       if(wNoti) pushNotice(payload);
       else toast('공지를 올렸어요 · 알림은 보내지 않았어요', 4000);
     }
@@ -2933,7 +2993,202 @@ function aiAdd(cls, text, sources, id){
 }
 
 const AI_HELLO = '무엇이든 물어보세요.\n예) 이번 주 수행평가 뭐 있어?';
-function openAi(focus){
+/* ═══ 사진 속 글 읽기 (관리자) — 읽은 글을 공지에 저장해 두면 AI 도우미가 본문과 함께 읽음 ═══ */
+let ocrFor = null, ocrBusy = false, ocrLast = { marks:[], miss:[] };
+function openOcr(i){
+  ocrFor = i;
+  document.getElementById('ocrText').value = i.ocr || '';
+  ocrLast = { marks: i.ocrMarks || [], miss: i.ocrMiss || [] };
+  ocrPaint(i.ocr || '', ocrLast.marks, ocrLast.miss, null);
+  document.getElementById('ocrState').textContent = `사진 ${(i.images || []).length}장`;
+  openSheet('ocr');
+}
+// 긴 변 2000px로 줄여서 보냄 (글자는 읽히면서 전송은 가볍게)
+function shrinkForAi(src, max = 2000){
+  return new Promise((ok, no) => {
+    const im = new Image();
+    im.onload = () => {
+      const k = Math.min(1, max / Math.max(im.width, im.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(im.width * k); c.height = Math.round(im.height * k);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      ok(c.toDataURL('image/jpeg', 0.86));
+    };
+    im.onerror = () => no(new Error('사진을 열 수 없어요'));
+    im.src = src;
+  });
+}
+/* 사진 한 장을 두 가지 방식으로 읽음
+   ① 기기 인식(Tesseract) — 이 기기 안에서 글자를 인식. 지어내지 않지만 표·순서에 약함
+   ② 사진 AI — 표와 구조를 이해하지만 글자를 지어낼 수 있음
+   둘의 결과를 전체 낱말 단위로 비교해서 서로 다른 곳을 표시 */
+let tessReady = null;
+function loadTess(){
+  if(tessReady) return tessReady;
+  tessReady = new Promise((ok, no) => {
+    const sc = document.createElement('script');
+    sc.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/dist/tesseract.min.js';
+    sc.onload = async () => {
+      try{ ok(await window.Tesseract.createWorker('kor+eng')); }catch(e){ tessReady = null; no(e); }
+    };
+    sc.onerror = () => { tessReady = null; no(new Error('글자 인식 프로그램을 받지 못했어요')); };
+    document.head.appendChild(sc);
+  });
+  return tessReady;
+}
+async function readLocal(img){
+  const w = await loadTess();
+  const r = await w.recognize(img);
+  return String(r.data && r.data.text || '').replace(/\n{3,}/g, '\n\n').trim();
+}
+async function readByAi(path, payload){
+  const user = auth.currentUser;
+  if(!user) throw new Error('로그인이 필요해요');
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 90000);
+  try{
+    const r = await fetch(PUSH_URL + path, { method:'POST', signal: ctrl.signal,
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ idToken: await user.getIdToken(), ...payload }) });
+    const d = await r.json();
+    if(!d.ok) throw new Error(d.error || '읽지 못했어요');
+    return String(d.text || '').trim();
+  }finally{ clearTimeout(timer); }
+}
+
+// 글자·숫자만 남겨 비교 (띄어쓰기·기호·줄 순서 차이는 무시)
+const ocrNorm = t => String(t || '').toLowerCase().replace(/[^0-9a-z가-힣]/g, '');
+const ocrWords = t => String(t || '').split(/\s+/).map(w => w.replace(/^[^0-9A-Za-z가-힣]+|[^0-9A-Za-z가-힣]+$/g, '')).filter(Boolean);
+// base 글에 없는 낱말을 골라냄 — 숫자가 든 낱말은 한 글자여도 검사
+function ocrDiff(text, base){
+  const hay = ocrNorm(base), seen = new Set(), out = [];
+  ocrWords(text).forEach(w => {
+    const n = ocrNorm(w);
+    if(!n || (n.length < 2 && !/\d/.test(n)) || seen.has(w)) return;
+    seen.add(w);
+    if(!hay.includes(n)) out.push(w);
+  });
+  return out;
+}
+
+// 공지의 사진을 한 장씩 읽어 { text, marks, miss, how } 로 돌려줌
+async function ocrRead(target, onStep){
+  if(!auth.currentUser) throw new Error('로그인이 필요해요');
+  const big = await loadPhotos(target.id);
+  const list = (target.images || []).map((t, k) => big[k] || t);
+  const out = [], marks = [], miss = [], how = { both:0, ai:0, local:0 };
+  for(let k = 0; k < list.length; k++){
+    if(onStep) onStep(k, list.length, out);
+    const img = await shrinkForAi(list[k]);
+    const [L, A] = await Promise.allSettled([ readLocal(img), readByAi('ocr', { img }) ]);
+    const local = L.status === 'fulfilled' ? L.value : '';
+    let ai = A.status === 'fulfilled' ? A.value : '';
+    let text = '';
+    if(ai && local){                       // 둘 다 성공 → 구조는 AI 것을 쓰고, 서로 다른 낱말을 표시
+      text = ai; how.both++;
+      marks.push(...ocrDiff(ai, local));
+      miss.push(...ocrDiff(local, ai).filter(w => /^[0-9가-힣.,:~()\-\/]+$/.test(w)));
+    }else if(local){                       // 사진 AI 실패 → 기기 인식 결과를 글 AI가 정리, 원본에 없는 낱말을 표시
+      try{ ai = await readByAi('tidy', { text: local.slice(0, 5000) }); }catch{ ai = ''; }
+      text = ai || local; how.local++;
+      if(ai) marks.push(...ocrDiff(ai, local));
+    }else if(ai){                          // 기기 인식 실패 → AI 결과만 (비교 없음)
+      text = ai; how.ai++;
+    }else{
+      throw new Error(A.reason && A.reason.message || '사진을 읽지 못했어요');
+    }
+    out.push((list.length > 1 ? `[사진 ${k + 1}]\n` : '') + text);
+  }
+  if(onStep) onStep(list.length, list.length, out);
+  const uniq = a => [...new Set(a)].slice(0, 80);
+  return { text: out.join('\n\n').slice(0, 6000), marks: uniq(marks), miss: uniq(miss).slice(0, 40), how };
+}
+
+// 비교 결과를 노란 표시로 보여줌
+function ocrPaint(text, marks, miss, how){
+  const v = document.getElementById('ocrView');
+  if(!text || !(marks && marks.length) && !(miss && miss.length) && !how){ v.hidden = true; v.innerHTML = ''; return; }
+  let html = esc(text);
+  [...(marks || [])].sort((a, b) => b.length - a.length).forEach(w => {
+    const e = esc(w).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    html = html.replace(new RegExp('(?<![0-9A-Za-z가-힣<>/])' + e + '(?![0-9A-Za-z가-힣])', 'g'), '<mark>' + esc(w) + '</mark>');
+  });
+  const n = (marks || []).length;
+  let head;
+  if(how && how.ai && !how.both && !how.local) head = '기기 인식이 실패해서 AI가 읽은 글만 있어요. 비교가 안 됐으니 원본과 직접 확인해 주세요.';
+  else if(how && how.local && !how.both) head = n ? `사진 AI가 실패해서 기기 인식 결과를 AI가 정리했어요. 정리하면서 바뀐 곳 ${n}군데를 노랗게 표시했어요.` : '사진 AI가 실패해서 기기 인식 결과를 AI가 정리했어요. 바뀐 곳은 없어요.';
+  else head = n ? `두 방식이 서로 다르게 읽은 곳 ${n}군데를 노랗게 표시했어요. 이 부분만 원본과 비교하면 돼요.` : '두 방식이 읽은 내용이 같아요.';
+  v.innerHTML = `<span class="ovh">${head}</span>${html}` +
+    (miss && miss.length ? `<span class="ovm">기기 인식에만 있는 글(AI가 빠뜨렸을 수 있어요): ${miss.map(esc).join(' · ')}</span>` : '');
+  v.hidden = false;
+}
+
+const ocrWhy = e => e && e.name === 'AbortError' ? '시간이 너무 오래 걸렸어요' : String(e && e.message || e).slice(0, 120);
+
+document.getElementById('ocrRun').onclick = async () => {
+  if(ocrBusy || !ocrFor) return;
+  const box = document.getElementById('ocrText'), st = document.getElementById('ocrState'), btn = document.getElementById('ocrRun');
+  if(box.value.trim() && !await ask('다시 읽을까요?', '지금 적혀 있는 내용은 새로 읽은 글로 바뀌어요.', '다시 읽기')) return;
+  ocrBusy = true; btn.disabled = true;
+  try{
+    const r = await ocrRead(ocrFor, (k, n, out) => {
+      if(out.length) box.value = out.join('\n\n').slice(0, 6000);
+      if(k < n) st.textContent = `사진 ${k + 1} / ${n} 읽는 중… (기기 인식 + AI, 한 장에 20~60초)`;
+    });
+    box.value = r.text;
+    ocrLast = { marks: r.marks, miss: r.miss };
+    ocrPaint(r.text, r.marks, r.miss, r.how);
+    st.textContent = '다 읽었어요. 노란 표시를 원본과 비교해서 아래 칸에서 고친 뒤 저장하세요.';
+  }catch(e){ st.textContent = '읽기를 멈췄어요: ' + ocrWhy(e); }
+  ocrBusy = false; btn.disabled = false;
+};
+
+// 공지를 올리거나 사진을 바꾸면 자동으로 읽어서 저장 (확인·수정은 공지의 '보기·수정'에서)
+async function autoOcr(id, images){
+  if(AI_MODE === 'off' || !images || !images.length || ocrBusy) return;
+  ocrBusy = true;
+  try{
+    toast(`사진 ${images.length}장을 AI가 읽는 중이에요. 앱을 닫지 말아 주세요`, 5000);
+    const r = await ocrRead({ id, images });
+    if(r.text){
+      await updateDoc(doc(db,'notices',id), { ocr: r.text, ocrAuto: true, ocrMarks: r.marks, ocrMiss: r.miss });
+      toast(r.marks.length ? `사진 속 글을 읽어 뒀어요. 확인할 곳 ${r.marks.length}군데가 있어요` : '사진 속 글을 읽어 뒀어요', 5000);
+    }
+  }catch(e){ toast('사진 읽기를 못 마쳤어요 (' + ocrWhy(e).slice(0, 40) + '). 공지에서 다시 읽힐 수 있어요', 6000); }
+  ocrBusy = false;
+}
+
+document.getElementById('ocrSave').onclick = async () => {
+  if(ocrBusy || !ocrFor) return;
+  const text = document.getElementById('ocrText').value.trim().slice(0, 6000);
+  try{
+    // 저장 = 관리자가 확인했다는 뜻이므로 표시는 지움 (알림·새 글 표시는 건드리지 않음)
+    await updateDoc(doc(db,'notices',ocrFor.id), { ocr: text, ocrAuto: false, ocrMarks: [], ocrMiss: [] });
+    ocrFor.ocr = text; ocrFor.ocrAuto = false; ocrFor.ocrMarks = []; ocrFor.ocrMiss = [];
+    toast(text ? '저장했어요. 이제 AI가 이 내용도 읽어요' : '사진 속 글을 비웠어요');
+    closeSheet('ocr');
+  }catch(e){ note('저장하지 못했어요', '내 글이 아니거나 연결이 불안정해요. 잠시 뒤 다시 시도해 주세요.'); }
+};
+
+// 특정 공지를 지정해서 묻기 — 상세 화면의 'AI에게 묻기'로 들어오면 그 공지 전문을 AI가 읽음
+let aiFocus = null;
+function aiSetFocus(n){
+  aiFocus = n ? { id: n.id, title: String(n.title || '공지') } : null;
+  document.getElementById('aiFocus').hidden = !aiFocus;
+  document.getElementById('aiFocusT').textContent = aiFocus ? `「${aiFocus.title}」 공지에 대해 묻는 중` : '';
+  document.getElementById('aiLog').classList.toggle('focused', !!aiFocus);
+  document.getElementById('aiInp').placeholder = aiFocus ? '이 공지에 대해 물어보세요' : '예) 이번 주 수행평가 뭐 있어?';
+}
+document.getElementById('aiFocusX').onclick = () => aiSetFocus(null);
+document.querySelectorAll('#aiFocus .aichips button').forEach(b => b.onclick = () => {
+  if(aiBusy) return;
+  document.getElementById('aiInp').value = b.dataset.q;
+  aiAsk();
+});
+document.getElementById('aiHereBtn').onclick = () => { if(current && !current.readonly) openAi(false, current); };
+
+function openAi(focus, notice){
+  aiSetFocus(notice || null);
   const log = document.getElementById('aiLog');
   if(!log.children.length){                       // 처음 열 때 저장된 대화를 되살림
     const saved = aiLoad();
@@ -3020,7 +3275,7 @@ async function aiAsk(){
     const r = await fetch(PUSH_URL + 'ask', {
       method:'POST', signal: ctrl.signal,
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ q, dev: devId, h: hist.filter(m => !/^(연결하지 못했어요|답이 너무 오래|답변을 만들지|오늘 |하루 \d+번|AI가 빈|AI 도우미가 꺼져)/.test(m.t)), idToken })
+      body: JSON.stringify({ q, dev: devId, n: aiFocus ? aiFocus.id : '', h: hist.filter(m => !/^(연결하지 못했어요|답이 너무 오래|답변을 만들지|오늘 |하루 \d+번|AI가 빈|AI 도우미가 꺼져)/.test(m.t)), idToken })
     });
     clearTimeout(timer);
     const d = await r.json();
