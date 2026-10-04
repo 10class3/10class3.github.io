@@ -1,0 +1,17 @@
+{
+  "name": "학급 알리미",
+  "short_name": "학급 알리미",
+  "description": "학급 알리미 체험용",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1e2430",
+  "theme_color": "#1e2430",
+  "lang": "ko",
+  "icons": [
+    { "src": "../icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "../icon-splash.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "../icon-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
