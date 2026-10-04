@@ -1,6 +1,6 @@
 // ── 3반 알리미 서비스워커 (캐시 + 푸시 알림) ──
 // 앱을 수정하면 아래 숫자를 v11, v12... 로 올리세요
-const CACHE = 'demo-v134';
+const CACHE = 'demo-v138';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 /* ── 푸시 알림 ── */
@@ -42,6 +42,7 @@ self.addEventListener('notificationclick', e => {
     clients.matchAll({ type:'window', includeUncontrolled:true }).then(list => {
       // 이미 열려 있으면 그 창에 '새 알림 열기' 신호를 보냄
       for(const c of list){
+        if(!c.url.includes('/demo/')) continue;         // 실제 앱 창은 건드리지 않음
         if('focus' in c){ c.postMessage({ type:'OPEN_NEWS' }); return c.focus(); }
       }
       if(clients.openWindow) return clients.openWindow('./?new=1');
@@ -71,7 +72,8 @@ self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET' ||
       url.hostname.includes('googleapis.com') ||
       url.hostname.includes('gstatic.com') ||
-      url.hostname.includes('firebase')) return;
+      url.hostname.includes('firebase') ||
+      url.hostname.includes('jsdelivr.net')) return;   // 글자 인식 자료는 용량이 커서 따로 저장됨
 
   // 우리 파일은 브라우저 저장본을 건너뛰고 항상 서버에서 최신인지 확인
   const fresh = url.origin === self.location.origin
