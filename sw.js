@@ -1,6 +1,6 @@
 // ── 3반 알리미 서비스워커 (캐시 + 푸시 알림) ──
 // 앱을 수정하면 아래 숫자를 v11, v12... 로 올리세요
-const CACHE = 'banner-v133';
+const CACHE = 'banner-v134';
 const ASSETS = ['./', './index.html', './manifest.json',
                 './icon-192.png', './icon-512.png', './icon-splash.png',
                 './favicon-light.png', './favicon-dark.png', './badge.png'];
@@ -64,7 +64,7 @@ self.addEventListener('message', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys =>
-    Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))));
+    Promise.all(keys.filter(k => k.startsWith('banner-') && k !== CACHE).map(k => caches.delete(k)))));
   self.clients.claim();
 });
 

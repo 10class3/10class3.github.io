@@ -933,7 +933,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v129</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v130</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -994,9 +994,20 @@ const firebaseConfig = {
 const app  = initializeApp(firebaseConfig);
 const db   = getFirestore(app);
 const auth = getAuth(app);
-const COL  = collection(db, 'notices');
-const MSG  = collection(db, 'messages');
-const CFG  = doc(db, 'config', 'categories');
+
+/* ═══ 공간 나누기 ═══
+   SPACE: '' = 실제 3반 · 'demo' = 체험판 (대회 시연·심사용, 실제 반 데이터와 완전히 분리) */
+const SPACE = '';
+const C = n => SPACE ? SPACE + '_' + n : n;             // 데이터 칸 이름 (demo_notices …)
+// 체험판은 기기에 저장하는 값도 따로 둠 (같은 주소 아래라 섞이지 않게)
+const localStorage = SPACE ? {
+  getItem: k => window.localStorage.getItem(SPACE + ':' + k),
+  setItem: (k, v) => window.localStorage.setItem(SPACE + ':' + k, v),
+  removeItem: k => window.localStorage.removeItem(SPACE + ':' + k)
+} : window.localStorage;
+const COL  = collection(db, C('notices'));
+const MSG  = collection(db, C('messages'));
+const CFG  = doc(db, C('config'), 'categories');
 
 /* ═══ 화면 모드 ═══ */
 const themeMeta = document.getElementById('themeMeta');
@@ -1062,7 +1073,7 @@ try{                                     // 지난번에 받은 값으로 먼저
 function saveCache(){
   try{ localStorage.setItem('cache', JSON.stringify({ meals, timetable, quote })); }catch{}
 }
-const MAIN_UID = 'zWlG3sYcv8OayfwsoYKYcF8VHz42';   // 총괄 관리자 (Authentication의 사용자 UID)
+const MAIN_UID = SPACE ? 'DEMO_MAIN_UID' : 'zWlG3sYcv8OayfwsoYKYcF8VHz42';   // 총괄 관리자 (Authentication의 사용자 UID)
 let myUid = null, isMain = false;
 const canEdit = i => isAdmin && !i.readonly && (isMain || (i.author && i.author === myUid));
 
@@ -1085,10 +1096,10 @@ if(!devId){
   devId = makeDevId();
   localStorage.setItem('devId', devId);
 }
-const READS = collection(db, 'reads');
-const PHOTOS = collection(db, 'photos');
-const VOTES  = collection(db, 'votes');
-const FILES  = collection(db, 'files');
+const READS = collection(db, C('reads'));
+const PHOTOS = collection(db, C('photos'));
+const VOTES  = collection(db, C('votes'));
+const FILES  = collection(db, C('files'));
 let pics = [], rPics = [], sessions = [], editId = null, wCat = cats[0].id;
 
 /* ═══ 날짜 ═══ */
@@ -1406,7 +1417,7 @@ window.openDetail = id => {
   if(!i.readonly && isUnread(i)){
     localStorage.setItem('read_'+i.id, String(Date.now()));   // 읽은 시각 기록
     setTimeout(renderNewsCard, 0);
-    setDoc(doc(db,'reads', `${i.id}_${devId}`), { n:i.id, at:serverTimestamp() }).catch(()=>{});
+    setDoc(doc(db, C('reads'), `${i.id}_${devId}`), { n:i.id, at:serverTimestamp() }).catch(()=>{});
   }
 
   let sched;
@@ -1550,7 +1561,7 @@ function showPoll(i){
     box.querySelectorAll('.popt').forEach(b => b.onclick = async () => {
       const pick = +b.dataset.v;
       try{
-        await setDoc(doc(db,'votes', `${i.id}_${myNum}`),
+        await setDoc(doc(db, C('votes'), `${i.id}_${myNum}`),
           { n:i.id, o:pick, num:myNum, k:keyOf(myNum), at:serverTimestamp() });
       }catch{
         note('투표할 수 없어요', anon
@@ -1612,7 +1623,7 @@ document.getElementById('delBtn').onclick = async () => {
   deleting = true;
   try{
     const pid = current.id;
-    await deleteDoc(doc(db,'notices',pid));
+    await deleteDoc(doc(db, C('notices'),pid));
     getDocs(query(PHOTOS, where('n','==',pid)))
       .then(s => s.forEach(d => deleteDoc(d.ref).catch(()=>{}))).catch(()=>{});
     getDocs(query(VOTES, where('n','==',pid)))
@@ -1974,7 +1985,7 @@ onSnapshot(NQ, snap => {
 });
 
 /* ═══ 알림 (푸시 + 임박 리마인더) ═══ */
-const TOKENS = collection(db, 'tokens');
+const TOKENS = collection(db, C('tokens'));
 const bell = document.getElementById('bellBtn');
 let notifyOn = localStorage.getItem('notify') === '1';
 let swReg = null, messaging = null;
@@ -2032,7 +2043,7 @@ async function subscribe(silent){
       swReg = await navigator.serviceWorker.ready;
       const token = await getToken(m, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swReg });
       if(!token) throw new Error('토큰이 비어 있음');
-      await setDoc(doc(db,'tokens',token), {
+      await setDoc(doc(db, C('tokens'),token), {
         createdAt: serverTimestamp(),
         admin: !!isAdmin,                    // 건의 알림은 관리자 기기에만
         ua: navigator.userAgent.slice(0,120)
@@ -2052,7 +2063,7 @@ async function subscribe(silent){
 async function unsubscribe(){
   const token = localStorage.getItem('fcmToken');
   try{
-    if(token) await deleteDoc(doc(db,'tokens',token));
+    if(token) await deleteDoc(doc(db, C('tokens'),token));
     const m = await initMessaging();
     if(m) await deleteToken(m);
   }catch{}
@@ -2150,7 +2161,7 @@ document.getElementById('rSend').onclick = async () => {
     closeSheet('report'); toast('보냈어요. 고마워요!');
     fetch(PUSH_URL, {                        // 관리자에게만 도착 알림
       method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ report:true })
+      body: JSON.stringify({ report:true, space: SPACE })
     }).catch(()=>{});
   }catch{ toast('전송에 실패했어요. 사진을 빼고 다시 시도해 보세요'); }
   btn.disabled = false; btn.textContent = '보내기';
@@ -2213,7 +2224,7 @@ function watchMessages(on){
     });
     document.querySelectorAll('#inboxBody .mdel').forEach(b => b.onclick = async () => {
       if(!await ask('이 메시지를 삭제할까요?', '', '삭제', true)) return;
-      try{ await deleteDoc(doc(db,'messages',b.dataset.mid)); }catch{ toast('삭제 실패'); }
+      try{ await deleteDoc(doc(db, C('messages'),b.dataset.mid)); }catch{ toast('삭제 실패'); }
     });
   }, () => {});
 }
@@ -2242,8 +2253,9 @@ onAuthStateChanged(auth, user => {
   document.getElementById('fab').classList.toggle('on', isAdmin);
   document.getElementById('flashRow').hidden = !isAdmin;
   paintAiRow();
+  demoSeed();
   const tk = localStorage.getItem('fcmToken');
-  if(tk) setDoc(doc(db,'tokens',tk), { admin: !!isAdmin }, { merge:true }).catch(()=>{});
+  if(tk) setDoc(doc(db, C('tokens'),tk), { admin: !!isAdmin }, { merge:true }).catch(()=>{});
   document.getElementById('gearRow').hidden = !isMain;
   document.getElementById('backupRow').hidden = !isMain;
 
@@ -2684,9 +2696,9 @@ document.getElementById('saveBtn').onclick = async () => {
   btn.disabled = true; btn.textContent = '저장 중…';
   try{
     if(editId){
-      await updateDoc(doc(db,'notices',editId), { ...payload, updatedAt: serverTimestamp() });
+      await updateDoc(doc(db, C('notices'),editId), { ...payload, updatedAt: serverTimestamp() });
       const eid = editId, redo = picsNew || (!pics.length && hadOcr);
-      if(redo && !pics.length) updateDoc(doc(db,'notices',eid), { ocr: '', ocrAuto: false }).catch(() => {});
+      if(redo && !pics.length) updateDoc(doc(db, C('notices'),eid), { ocr: '', ocrAuto: false }).catch(() => {});
       Promise.resolve(savePhotos(eid)).then(() => { if(picsNew) autoOcr(eid, payload.images); });
       saveFiles(editId);
       if(wNoti) pushNotice(payload, true);
@@ -2903,6 +2915,61 @@ function showFiles(i){
   });
 }
 
+/* ═══ 체험판 전용: 샘플 공지 채우기 ═══ */
+let demoAsked = false;
+function demoSeed(){
+  if(!SPACE || !isAdmin || demoAsked) return;
+  demoAsked = true;
+  setTimeout(async () => {
+    if(items.length || document.querySelector('.sheet.on, .modal.on')) return;
+    if(!await ask('샘플 공지를 채울까요?', '체험판이 비어 있어요. 수행평가·행사·투표 등 예시 공지 7개를 넣어 드려요.', '채우기')) return;
+    const day = n => { const d = new Date(TODAY); d.setDate(d.getDate() + n); return ymd(d); };
+    // 안내문 사진 한 장을 그려서 넣음 (사진 속 글 읽기 체험용)
+    const cv = document.createElement('canvas'); cv.width = 1200; cv.height = 900;
+    const g = cv.getContext('2d');
+    g.fillStyle = '#f6f4ee'; g.fillRect(0, 0, 1200, 900); g.fillStyle = '#16181d';
+    g.font = '700 46px sans-serif'; g.fillText('2학기 국어 수행평가 안내', 60, 100);
+    g.font = '500 30px sans-serif';
+    const hand = ['1. 평가 내용: 독서 기반 서사·주제 분석 보고서 작성', '2. 대상 도서: 학급에서 정한 소설 1권',
+      `3. 일시: ${korDate(day(3))} 3교시, ${korDate(day(5))} 5교시`, '4. 분량: A4 2쪽 이내, 1,200자 이상 1,500자 이하',
+      '5. 준비물: 도서, 검정 볼펜, 개요 작성지(사전 배부)', '6. 유의사항: 미제출 시 기본 점수 40점, 표절 시 0점 처리',
+      '7. 채점: 주제 파악 30점 / 서사 분석 40점 / 표현 30점'];
+    hand.forEach((t, k) => g.fillText(t, 60, 190 + k * 70));
+    const big = cv.toDataURL('image/jpeg', 0.9);
+    const tv = document.createElement('canvas'); tv.width = 640; tv.height = 480;
+    tv.getContext('2d').drawImage(cv, 0, 0, 640, 480);
+    const thumb = tv.toDataURL('image/jpeg', 0.7);
+
+    const base = { pin:false, holiday:false, files:[], range:null, poll:null, author: myUid || '', authorName:'작성자', sessions:[], images:[], date:'', body:'' };
+    const list = [
+      { ...base, cat:'행사', pin:true, title:'학급 알리미 사용법',
+        body:'이곳은 체험용 반이에요. 실제 학급 데이터와는 분리돼 있어요.\n\n- 오른쪽 아래 "AI에게 묻기"로 "이번 주 수행평가 뭐 있어?" 물어보기\n- 공지를 열고 "AI에게 묻기" → "요약" 눌러 보기\n- + 버튼으로 공지를 직접 올려 보기\n- 사진이 있는 공지에서 "보기·수정"으로 사진 속 글 확인하기' },
+      { ...base, cat:'수행평가', title:'국어 수행평가 — 독서 보고서', date: day(3), images:[thumb],
+        sessions:[{ label:'1차시 (개요)', date: day(3), time:'' }, { label:'2차시 (본문)', date: day(5), time:'' }],
+        body:'자세한 내용은 사진의 안내문을 확인하세요.\n\n- 책 가져오기\n- 개요 작성지 챙기기',
+        ocr: '2학기 국어 수행평가 안내\n' + hand.join('\n'), ocrAuto:false, ocrMarks:[], ocrMiss:[] },
+      { ...base, cat:'수행평가', title:'수학 수행평가 — 서술형 평가', date: day(6),
+        body:'범위: 교과서 3단원 전체\n풀이 과정을 반드시 적어야 점수가 인정돼요.\n계산기 사용 불가.' },
+      { ...base, cat:'생기부', title:'진로 활동 보고서 제출', range:{ from: day(-2), to: day(4), fromTime:'', time:'16:30' },
+        body:'양식은 학급 단체방에 올린 파일을 사용하세요.\n분량: 500자 이상\n제출: 담임 선생님께 직접 제출' },
+      { ...base, cat:'행사', title:'체육대회', date: day(12),
+        body:'종목: 피구, 계주, 줄다리기\n반티는 투표로 정해요.',
+        poll:{ q:'반티 색을 골라 주세요', options:['남색','흰색','검정'], mode:'open' } },
+      { ...base, cat:'행사', title:'현장체험학습 안내', date: day(20),
+        body:'집합: 오전 8시 20분 운동장\n준비물: 도시락, 물, 편한 신발\n동의서는 일주일 전까지 제출' },
+      { ...base, cat:'수행평가', title:'영어 수행평가 — 지문 분석', date: day(-5),
+        body:'지문 2개 중 하나를 골라 분석 보고서를 작성했어요. (지난 공지 예시)' }
+    ];
+    try{
+      for(const p of list){
+        const ref = await addDoc(COL, { ...p, createdAt: serverTimestamp() });
+        if(p.images.length) await addDoc(PHOTOS, { n: ref.id, i: 0, d: big, at: serverTimestamp() });
+      }
+      toast('샘플 공지 7개를 넣었어요');
+    }catch(e){ note('샘플을 넣지 못했어요', '보안 규칙에 체험판 칸이 추가됐는지 확인해 주세요.'); }
+  }, 2200);
+}
+
 /* ═══ AI 도우미 ═══
    AI_MODE: 'off' = 숨김(배포용) · 'admin' = 총괄 관리자만(시험용) · 'all' = 전원 */
 const AI_MODE = 'all';
@@ -3049,7 +3116,7 @@ async function readByAi(path, payload){
   try{
     const r = await fetch(PUSH_URL + path, { method:'POST', signal: ctrl.signal,
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ idToken: await user.getIdToken(), ...payload }) });
+      body: JSON.stringify({ idToken: await user.getIdToken(), space: SPACE, ...payload }) });
     const d = await r.json();
     if(!d.ok) throw new Error(d.error || '읽지 못했어요');
     return String(d.text || '').trim();
@@ -3151,7 +3218,7 @@ async function autoOcr(id, images){
     toast(`사진 ${images.length}장을 AI가 읽는 중이에요. 앱을 닫지 말아 주세요`, 5000);
     const r = await ocrRead({ id, images });
     if(r.text){
-      await updateDoc(doc(db,'notices',id), { ocr: r.text, ocrAuto: true, ocrMarks: r.marks, ocrMiss: r.miss });
+      await updateDoc(doc(db, C('notices'),id), { ocr: r.text, ocrAuto: true, ocrMarks: r.marks, ocrMiss: r.miss });
       toast(r.marks.length ? `사진 속 글을 읽어 뒀어요. 확인할 곳 ${r.marks.length}군데가 있어요` : '사진 속 글을 읽어 뒀어요', 5000);
     }
   }catch(e){ toast('사진 읽기를 못 마쳤어요 (' + ocrWhy(e).slice(0, 40) + '). 공지에서 다시 읽힐 수 있어요', 6000); }
@@ -3163,7 +3230,7 @@ document.getElementById('ocrSave').onclick = async () => {
   const text = document.getElementById('ocrText').value.trim().slice(0, 6000);
   try{
     // 저장 = 관리자가 확인했다는 뜻이므로 표시는 지움 (알림·새 글 표시는 건드리지 않음)
-    await updateDoc(doc(db,'notices',ocrFor.id), { ocr: text, ocrAuto: false, ocrMarks: [], ocrMiss: [] });
+    await updateDoc(doc(db, C('notices'),ocrFor.id), { ocr: text, ocrAuto: false, ocrMarks: [], ocrMiss: [] });
     ocrFor.ocr = text; ocrFor.ocrAuto = false; ocrFor.ocrMarks = []; ocrFor.ocrMiss = [];
     toast(text ? '저장했어요. 이제 AI가 이 내용도 읽어요' : '사진 속 글을 비웠어요');
     closeSheet('ocr');
@@ -3275,7 +3342,7 @@ async function aiAsk(){
     const r = await fetch(PUSH_URL + 'ask', {
       method:'POST', signal: ctrl.signal,
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ q, dev: devId, n: aiFocus ? aiFocus.id : '', h: hist.filter(m => !/^(연결하지 못했어요|답이 너무 오래|답변을 만들지|오늘 |하루 \d+번|AI가 빈|AI 도우미가 꺼져)/.test(m.t)), idToken })
+      body: JSON.stringify({ space: SPACE, q, dev: devId, n: aiFocus ? aiFocus.id : '', h: hist.filter(m => !/^(연결하지 못했어요|답이 너무 오래|답변을 만들지|오늘 |하루 \d+번|AI가 빈|AI 도우미가 꺼져)/.test(m.t)), idToken })
     });
     clearTimeout(timer);
     const d = await r.json();
@@ -3358,7 +3425,7 @@ document.getElementById('readAll').onclick = async () => {
 
   [...new Set(list.map(e => e.item.id))].forEach(id => {
     localStorage.setItem('read_' + id, String(Date.now()));
-    setDoc(doc(db,'reads', `${id}_${devId}`), { n:id, at:serverTimestamp() }).catch(()=>{});
+    setDoc(doc(db, C('reads'), `${id}_${devId}`), { n:id, at:serverTimestamp() }).catch(()=>{});
   });
   drawNews(); renderNewsCard();
   toast('모두 읽음으로 표시했어요');
@@ -3386,7 +3453,7 @@ if('serviceWorker' in navigator){
 }
 
 /* ═══ 즉시 공지 ═══ */
-const FLASH = doc(db, 'config', 'flash');
+const FLASH = doc(db, C('config'), 'flash');
 let flash = null;
 
 const MEGAPHONE = `<svg viewBox="0 0 24 24" width="19" height="19" fill="none"
@@ -3489,6 +3556,7 @@ async function pushFlash(text){
       method:'POST', signal: ctrl.signal,
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
+        space: SPACE,
         idToken: await user.getIdToken(),
         title: '즉시 공지',
         body: text
@@ -3498,7 +3566,7 @@ async function pushFlash(text){
   }catch{}
 }
 
-const QUOTE = doc(db, 'config', 'quote');
+const QUOTE = doc(db, C('config'), 'quote');
 onSnapshot(QUOTE, s => {
   const v = s.exists() ? s.data() : null;
   // 등록한 날이 지나면 자동으로 내려감
@@ -3734,6 +3802,7 @@ async function pushNotice(p, edited){
       method:'POST', signal: ctrl.signal,
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({
+        space: SPACE,
         idToken,
         title: `[${catName(p.cat)}] ${p.title}`,
         body: edited
