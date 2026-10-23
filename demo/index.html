@@ -118,11 +118,33 @@ header{position:sticky;top:0;z-index:20;background:var(--paper);
 .tab[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
 .tab .n{font-size:11px;font-weight:700;vertical-align:super;margin-left:3px}
 
-main{padding:0 20px}
+main{padding:0 20px 110px}
+body.hasfab main{padding-bottom:180px}          /* 아래 떠 있는 버튼에 마지막 줄이 가리지 않게 */
 
 /* 임박 배너 */
 .urgentbox{margin:18px 0 4px;padding:15px 16px;border-radius:13px;background:var(--soft);
   border:1.5px solid var(--urgent)}
+.ub .ubchk{margin-left:auto;flex:none;align-self:center;border:1.5px solid var(--rule);background:transparent;color:var(--dim);
+  border-radius:999px;padding:4px 11px;font-family:inherit;font-size:11.5px;font-weight:800;cursor:pointer}
+.ub .ubchk:active{transform:scale(.95)}
+.urgentbox .ubmore{margin:6px 0 0;font-size:12px;font-weight:700;color:var(--dimmer)}
+.urgentbox.calm h3{color:var(--dim)}
+.urgentbox.calm{border-color:var(--rule)}
+.urgentbox .ubsoon{color:var(--urgent);margin-left:6px}
+.row.done{opacity:.45}
+.donechip{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 6px;border-radius:5px;margin-right:6px;
+  vertical-align:2px;background:var(--ink);color:var(--paper)}
+body.hasfab .toast{bottom:calc(env(safe-area-inset-bottom) + 160px)}
+.stiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.stile{padding:14px;border-radius:13px;background:var(--soft)}
+.stile b{display:block;font-size:24px;font-weight:900;letter-spacing:-.03em}
+.stile span{font-size:12px;font-weight:700;color:var(--dim)}
+.sbars h4{margin:26px 0 10px;font-size:13px;font-weight:800}
+.sbar{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:11.5px;font-weight:700;color:var(--dim)}
+.sbar .sd{width:46px;flex:none}
+.sbar .st{flex:1;height:12px;border-radius:4px;background:var(--soft);overflow:hidden}
+.sbar .st i{display:block;height:100%;background:var(--ink);border-radius:4px}
+.sbar .sn{width:30px;text-align:right;flex:none;color:var(--ink)}
 .urgentbox h3{margin:0 0 10px;font-size:12px;font-weight:800;letter-spacing:.03em;color:var(--urgent)}
 .ub{display:flex;align-items:baseline;gap:9px;padding:5px 0;cursor:pointer}
 .ub b{font-size:13.5px;font-weight:900;color:var(--urgent);letter-spacing:-.03em;min-width:34px}
@@ -305,7 +327,9 @@ html.booting .fab{visibility:hidden}
 .ailog.picking .aimsg{cursor:pointer}
 .ailog.picking .aimsg[data-id]{opacity:.55}
 .ailog.picking .aimsg.sel{opacity:1;outline:2.5px solid var(--urgent);outline-offset:2px}
-.ailog.picking .aisrc button{pointer-events:none}
+.ailog.picking .aisrc button{border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);border-radius:999px;
+  padding:6px 12px;font-family:inherit;font-size:12px;font-weight:800;cursor:pointer}
+.aisrc button::before{content:'원문 · ';color:var(--dim)}
 .ocrtext{width:100%;min-height:46vh;padding:13px;border:1.5px solid var(--rule);border-radius:12px;background:var(--panel);
   color:var(--ink);font-family:inherit;font-size:14px;font-weight:600;line-height:1.65;resize:vertical}
 .ocrview{margin:0 0 12px;padding:13px;border:1.5px solid var(--rule);border-radius:12px;background:var(--soft);
@@ -632,11 +656,11 @@ html.booting .fab{visibility:hidden}
 </header>
 
 <main>
-  <div id="newsCard"></div>
   <div id="flashBox"></div>
+  <div id="urgentBox"></div>
+  <div id="newsCard"></div>
   <div id="topCards"></div>
   <div id="weekBox" hidden></div>
-  <div id="urgentBox"></div>
   <div id="list">
     <div class="skel"><div class="sk" style="height:26px"></div><div><div class="sk" style="height:17px;width:70%"></div><div class="sk" style="height:12px;width:45%;margin-top:9px"></div></div></div>
     <div class="skel"><div class="sk" style="height:26px"></div><div><div class="sk" style="height:17px;width:55%"></div><div class="sk" style="height:12px;width:38%;margin-top:9px"></div></div></div>
@@ -653,6 +677,7 @@ html.booting .fab{visibility:hidden}
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('detail')">← 목록</button>
     <div class="topacts">
+      <button id="doneBtn" hidden>완료 표시</button>
       <button id="aiHereBtn" hidden>AI에게 묻기</button>
       <button id="calBtn">캘린더</button>
       <button id="shareBtn">공유</button>
@@ -805,6 +830,14 @@ html.booting .fab{visibility:hidden}
   <div id="mealBody"></div>
 </section>
 
+<section class="sheet" id="stats">
+  <div class="sheettop">
+    <button class="xbtn" onclick="closeSheet('stats')">← 닫기</button>
+    <span class="stitle">사용 통계</span>
+  </div>
+  <div id="statsBody"></div>
+</section>
+
 <section class="sheet" id="ocr">
   <div class="sheettop">
     <button class="xbtn" onclick="closeSheet('ocr')">← 닫기</button>
@@ -921,11 +954,13 @@ html.booting .fab{visibility:hidden}
   </div>
   <div class="mrow2" id="mailRow" hidden><span>받은 쪽지</span>
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
+  <div class="mrow2" id="statsRow" hidden><span>사용 통계<br><small class="hint" style="margin:4px 0 0;display:block">방문 기기·AI 질문·알림 기기 수</small></span>
+    <button class="hbtn ghost" id="statsBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v134</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v135</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -965,7 +1000,7 @@ html.booting .fab{visibility:hidden}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
 import { getFirestore, collection, doc, addDoc, updateDoc, deleteDoc, setDoc, onSnapshot,
-         query, where, orderBy, limit, getDocs, serverTimestamp }
+         query, where, orderBy, limit, getDocs, getDoc, increment, serverTimestamp }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
   from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js';
@@ -1276,22 +1311,48 @@ function render(){
   box.querySelectorAll('.row').forEach(r => r.onclick = () => openDetail(r.dataset.id));
 }
 
+// 맨 위 '다가오는 할 일' — 7일 안의 일정 중 끝내지 않은 것 (2일 안은 빨간색)
 function renderUrgent(all){
   const box = document.getElementById('urgentBox');
-  const soon = all.filter(e => {
-      if(e.item.holiday) return false;          // 휴일은 마감이 아니므로 제외
-      const n = dday(e.date); return n !== null && n >= 0 && n <= 2;
+  const list = all.filter(e => {
+      if(e.item.holiday || e.item.readonly) return false;   // 휴일·학교 일정은 할 일이 아님
+      if(isDone(e.item.id, e.sess)) return false;
+      const n = dday(e.date); return n !== null && n >= 0 && n <= 7;
     })
-                  .sort((a,b) => a.date.localeCompare(b.date));
-  if(!soon.length){ box.innerHTML = ''; return; }
-  box.innerHTML = `<div class="urgentbox"><h3>곧 마감 ${soon.length}건</h3>` +
-    soon.map(e => `<div class="ub" data-id="${esc(e.item.id)}">
-      <b>${ddayText(dday(e.date)).num}</b>
+    .sort((a,b) => a.date.localeCompare(b.date) || String(a.time||'').localeCompare(String(b.time||'')));
+  if(!list.length){ box.innerHTML = ''; return; }
+  const soon = list.filter(e => dday(e.date) <= 2).length;
+  const show = list.slice(0, 4);
+  box.innerHTML = `<div class="urgentbox${soon ? '' : ' calm'}"><h3>다가오는 할 일 ${list.length}건${
+      soon ? `<span class="ubsoon">· 곧 마감 ${soon}건</span>` : ''}</h3>` +
+    show.map(e => `<div class="ub" data-id="${esc(e.item.id)}">
+      <b style="${dday(e.date) <= 2 ? '' : 'color:var(--ink)'}">${ddayText(dday(e.date)).num}</b>
       <span><i style="background:${catColor(e.item.cat)}"></i>${esc(catName(e.item.cat))} · ${
         e.sess?esc(e.sess)+' · ':''}${esc(e.item.title)}${
-        e.time ? ' (' + timeText(e.time) + ')' : ''}</span></div>`).join('') + '</div>';
+        e.time ? ' (' + timeText(e.time) + ')' : ''}</span>
+      <button class="ubchk" data-k="${esc(doneKey(e.item.id, e.sess))}" aria-label="완료로 표시">완료</button></div>`).join('') +
+    (list.length > show.length ? `<p class="ubmore">외 ${list.length - show.length}건은 아래 목록에 있어요</p>` : '') + '</div>';
   box.querySelectorAll('.ub').forEach(u => u.onclick = () => openDetail(u.dataset.id));
+  box.querySelectorAll('.ubchk').forEach(c => c.onclick = ev => {
+    ev.stopPropagation();
+    setDone([c.dataset.k], true);
+    toast('완료로 표시했어요. 공지를 열어 되돌릴 수 있어요');
+  });
 }
+
+/* ═══ 완료 표시 — 끝낸 일은 '다가오는 할 일'과 마감 알림에서 빠짐 (이 기기에만 저장) ═══ */
+const doneKey = (id, sess) => id + '|' + (sess || '');
+function doneSet(){ try{ return new Set(JSON.parse(localStorage.getItem('done') || '[]')); }catch{ return new Set(); } }
+const isDone = (id, sess) => doneSet().has(doneKey(id, sess));
+function setDone(keys, on){
+  const set = doneSet();
+  keys.forEach(k => on ? set.add(k) : set.delete(k));
+  localStorage.setItem('done', JSON.stringify([...set].slice(-400)));
+  render();
+}
+// 한 공지의 모든 일정(차시)을 한 번에
+const noticeKeys = i => (i.sessions && i.sessions.length && !i.range)
+  ? i.sessions.map((s, n) => doneKey(i.id, s.label || `${n+1}차시`)) : [doneKey(i.id, '')];
 
 /* ═══ 주간 보기 ═══ */
 function renderWeek(all){
@@ -1391,12 +1452,13 @@ function rowHTML(e, isPast){
     if(st === '진행 중') d = { num:'진행 중', label:'', cls:'ing' };
   }
   const thumbs = (i.images||[]).slice(0,3).map(s=>`<img src="${s}" alt="">`).join('');
-  return `<article class="row ${isPast?'past':''} ${i.holiday?'isHoli':''}" data-id="${esc(i.id)}">
+  const fin = !i.readonly && isDone(i.id, e.sess);
+  return `<article class="row ${isPast?'past':''} ${i.holiday?'isHoli':''} ${fin?'done':''}" data-id="${esc(i.id)}">
     <div class="dcell"><span class="dnum ${d.cls} ${
       String(d.num).length >= 6 ? 'xlong' : String(d.num).length >= 5 ? 'long' : ''
     }">${d.num}</span>${d.label?`<span class="dlabel">${d.label}</span>`:''}</div>
     <div>
-      <h2 class="rtitle">${i.pin?'<span class="pin">고정</span>':''}${i.holiday?'<span class="holi">휴일</span>':''}${i.poll?'<span class="pollchip">투표</span>':''}${
+      <h2 class="rtitle">${fin?'<span class="donechip">완료</span>':''}${i.pin?'<span class="pin">고정</span>':''}${i.holiday?'<span class="holi">휴일</span>':''}${i.poll?'<span class="pollchip">투표</span>':''}${
         (i.files&&i.files.length)?'<span class="filechip">파일</span>':''}${
         (i.grades && i.grades.length && i.grades.length < 3)
           ? `<span class="gradechip${i.mine?' mine':''}">${i.grades.join('·')}학년</span>` : ''}${e.sess?`<span class="chip">${esc(e.sess)}</span>`:''}<mark style="--mk:${catColor(i.cat)}">${esc(i.title)}</mark></h2>
@@ -1468,6 +1530,9 @@ window.openDetail = id => {
   showPoll(i);
   document.getElementById('calBtn').hidden = !(i.date || (i.sessions && i.sessions.length));
   document.getElementById('aiHereBtn').hidden = !(aiVisible() && !i.readonly);
+  const db_ = document.getElementById('doneBtn');
+  db_.hidden = !!i.readonly || !(i.date || (i.sessions && i.sessions.length) || i.range);
+  db_.textContent = noticeKeys(i).every(k => doneSet().has(k)) ? '완료 취소' : '완료 표시';
   document.getElementById('delBtn').hidden = !canEdit(i);
   document.getElementById('editBtn').hidden = !canEdit(i);
   openSheet('detail');
@@ -1638,6 +1703,14 @@ document.getElementById('delBtn').onclick = async () => {
 };
 
 /* ═══ 캘린더 내보내기 (.ics) ═══ */
+document.getElementById('doneBtn').onclick = () => {
+  if(!current || current.readonly) return;
+  const keys = noticeKeys(current), all = keys.every(k => doneSet().has(k));
+  setDone(keys, !all);
+  document.getElementById('doneBtn').textContent = all ? '완료 표시' : '완료 취소';
+  toast(all ? '완료 표시를 지웠어요' : '완료로 표시했어요. 다가오는 할 일에서 빠져요');
+};
+
 document.getElementById('calBtn').onclick = () => {
   if(!current) return;
   const i = current;
@@ -1989,6 +2062,51 @@ onSnapshot(NQ, snap => {
 
 /* ═══ 알림 (푸시 + 임박 리마인더) ═══ */
 const TOKENS = collection(db, C('tokens'));
+
+/* ═══ 사용 통계 ═══
+   방문: 기기마다 하루 한 번 그날 숫자를 1 올림 (누가 왔는지는 남기지 않음)
+   AI 질문: 서버가 세는 하루 사용량을 읽음 */
+(function countVisit(){
+  const today = ymd(new Date());
+  if(localStorage.getItem('visit') === today) return;
+  setDoc(doc(db, C('stats'), today), { n: increment(1) }, { merge:true })
+    .then(() => localStorage.setItem('visit', today)).catch(() => {});
+})();
+
+async function openStats(){
+  openSheet('stats');
+  const box = document.getElementById('statsBody');
+  box.innerHTML = '<div class="empty">불러오는 중…</div>';
+  const days = [...Array(14)].map((_, k) => { const d = new Date(TODAY); d.setDate(d.getDate() - 13 + k); return ymd(d); });
+  const num = p => p.then(x => x.exists() ? Number(x.data().n || 0) : 0).catch(() => null);
+  const [visits, asks, devices] = await Promise.all([
+    Promise.all(days.map(d => num(getDoc(doc(db, C('stats'), d))))),
+    Promise.all(days.map(d => num(getDoc(doc(db, 'ai_usage', (SPACE ? SPACE + '_' : '') + d + '_all'))))),
+    getDocs(TOKENS).then(x => x.size).catch(() => null)
+  ]);
+  const sum = a => a.reduce((t, v) => t + (v || 0), 0);
+  const show = v => v === null ? '–' : v;
+  const week = visits.slice(-7);
+  const bars = (title, arr) => {
+    const max = Math.max(1, ...arr.map(v => v || 0));
+    return `<div class="sbars"><h4>${title}</h4>${days.map((d, k) => `<div class="sbar">
+      <span class="sd">${+d.slice(5,7)}/${+d.slice(8,10)}</span>
+      <span class="st"><i style="width:${Math.round((arr[k] || 0) / max * 100)}%"></i></span>
+      <span class="sn">${show(arr[k])}</span></div>`).join('')}</div>`;
+  };
+  box.innerHTML = `<div class="stiles">
+      <div class="stile"><b>${show(visits[13])}</b><span>오늘 방문한 기기</span></div>
+      <div class="stile"><b>${Math.round(sum(week) / 7 * 10) / 10}</b><span>최근 7일 하루 평균</span></div>
+      <div class="stile"><b>${show(devices)}</b><span>알림 받는 기기</span></div>
+      <div class="stile"><b>${sum(asks)}</b><span>최근 14일 AI 질문</span></div>
+      <div class="stile"><b>${items.length}</b><span>올라온 공지</span></div>
+      <div class="stile"><b>${sum(visits)}</b><span>최근 14일 방문(기기·일)</span></div>
+    </div>
+    ${bars('날짜별 방문 기기', visits)}
+    ${bars('날짜별 AI 질문', asks)}
+    <p class="hint" style="margin-top:18px">방문은 같은 기기가 하루에 여러 번 열어도 1로 세요. 누가 방문했는지는 저장하지 않아요. 통계 기능을 넣은 날부터 세기 시작해요.</p>`;
+}
+document.getElementById('statsBtn').onclick = openStats;
 const bell = document.getElementById('bellBtn');
 let notifyOn = localStorage.getItem('notify') === '1';
 let swReg = null, messaging = null;
@@ -2099,7 +2217,7 @@ function maybeNotify(force){
   const key = 'notified-' + TODAY.toISOString().slice(0,10);
   if(!force && localStorage.getItem(key)) return;
 
-  const soon = expand().filter(e => { const n = dday(e.date); return n !== null && n >= 0 && n <= 2; });
+  const soon = expand().filter(e => { const n = dday(e.date); return n !== null && n >= 0 && n <= 2 && !isDone(e.item.id, e.sess); });
   if(!soon.length) return;
 
   const head = soon.map(e => (e.sess ? e.sess+' ' : '') + e.item.title).slice(0,3).join(', ');
@@ -2265,6 +2383,8 @@ onAuthStateChanged(auth, user => {
   const tk = localStorage.getItem('fcmToken');
   if(tk) setDoc(doc(db, C('tokens'),tk), { admin: !!isAdmin }, { merge:true }).catch(()=>{});
   document.getElementById('gearRow').hidden = !isMain;
+  document.getElementById('statsRow').hidden = !isMain;
+  document.body.classList.toggle('hasfab', isAdmin);
   document.getElementById('backupRow').hidden = !isMain;
 
   document.getElementById('adminChip').hidden = !isAdmin;
