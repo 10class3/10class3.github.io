@@ -544,7 +544,8 @@ html.booting .fab{visibility:hidden}
 .lightbox{position:fixed;top:0;right:0;bottom:0;left:0;z-index:120;background:#000;display:none;
   align-items:center;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
 .lightbox.on{display:flex}
-.lightbox img{width:100%;height:100%;object-fit:contain;display:block}
+.lightbox{touch-action:none;overflow:hidden}              /* 확대·이동은 앱이 직접 처리 */
+.lightbox img{width:100%;height:100%;object-fit:contain;display:block;transform-origin:50% 50%;will-change:transform;user-select:none;-webkit-user-select:none}
 .lbclose{position:absolute;top:calc(env(safe-area-inset-top) + 12px);right:16px;
   background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:999px;
   width:38px;height:38px;font-size:17px;cursor:pointer;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
@@ -960,7 +961,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v135</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v136</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1841,6 +1842,7 @@ function openLightbox(list, idx = 0, name = '사진'){
   pushLayer(hideLightbox);
 }
 function lbShow(){
+  if(typeof zReset === 'function') zReset();
   document.getElementById('lbImg').src = lbList[lbIdx] || '';
   const multi = lbList.length > 1;
   document.getElementById('lbPrev').hidden = !multi;
@@ -1855,7 +1857,7 @@ function lbMove(dir){
   lbShow();
 }
 function hideLightbox(){
-  lb.classList.remove('on'); lbList = [];
+  lb.classList.remove('on'); lbList = []; zReset();
   document.getElementById('lbImg').src='';
   if(!document.querySelector('.sheet.on')) document.body.style.overflow='';
 }
@@ -1865,14 +1867,109 @@ function closeLightbox(){
 document.getElementById('lbPrev').onclick = e => { e.stopPropagation(); lbMove(-1); };
 document.getElementById('lbNext').onclick = e => { e.stopPropagation(); lbMove(1); };
 
-// 스와이프로 넘기기
-let tX = null;
-lb.addEventListener('touchstart', e => { tX = e.touches[0].clientX; }, { passive:true });
-lb.addEventListener('touchend', e => {
-  if(tX === null) return;
-  const dx = e.changedTouches[0].clientX - tX; tX = null;
-  if(Math.abs(dx) >= 40) lbMove(dx < 0 ? 1 : -1);
+/* 사진 확대·이동·넘기기 — 사진 앱과 같은 손동작
+   · 두 손가락 벌리기/오므리기: 확대·축소 (최대 5배)
+   · 두 번 톡톡: 2.5배 확대 / 원래대로
+   · 확대한 상태에서 한 손가락: 사진 이동 (다음 장으로 넘어가지 않음)
+   · 확대하지 않은 상태에서 옆으로 밀기: 이전·다음 사진 */
+const lbImg = document.getElementById('lbImg');
+let zs = 1, zx = 0, zy = 0;                       // 배율, 이동량
+let g = null;                                      // 진행 중인 손동작
+let lastTap = 0, lastTapX = 0, lastTapY = 0, swallowUntil = 0, lastTouch = 0;
+
+function zApply(anim){
+  lbImg.style.transition = anim ? 'transform .22s ease' : 'none';
+  lbImg.style.transform = (zs === 1 && !zx && !zy) ? '' : `translate(${zx}px, ${zy}px) scale(${zs})`;
+}
+function zReset(anim){ zs = 1; zx = 0; zy = 0; zApply(anim); }
+// 사진이 화면에 실제로 그려진 크기 (위아래·좌우 검은 여백 제외)
+function zContent(){
+  const W = lbImg.clientWidth, H = lbImg.clientHeight;
+  const r = (lbImg.naturalWidth && lbImg.naturalHeight) ? lbImg.naturalWidth / lbImg.naturalHeight : W / H;
+  return W / H > r ? { W, H, cw: H * r, ch: H } : { W, H, cw: W, ch: W / r };
+}
+// 사진 밖으로 너무 끌려 나가지 않게
+function zClamp(){
+  const c = zContent();
+  const mx = Math.max(0, (c.cw * zs - c.W) / 2), my = Math.max(0, (c.ch * zs - c.H) / 2);
+  zx = Math.min(mx, Math.max(-mx, zx)); zy = Math.min(my, Math.max(-my, zy));
+}
+// 화면의 한 점(px, py)을 기준으로 배율을 바꿈
+function zZoomAt(ns, px, py, anim){
+  const r = lbImg.getBoundingClientRect();
+  const cx = px - (r.left + r.width / 2 - zx), cy = py - (r.top + r.height / 2 - zy);  // 중심 기준 좌표
+  ns = Math.min(5, Math.max(1, ns));
+  zx = cx - (cx - zx) * (ns / zs); zy = cy - (cy - zy) * (ns / zs); zs = ns;
+  if(zs <= 1.01){ zs = 1; zx = 0; zy = 0; }
+  zClamp(); zApply(anim);
+}
+const dist = (a, b) => Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY);
+
+lb.addEventListener('touchstart', e => {
+  lastTouch = Date.now();
+  if(e.target.closest('button')) return;         // 버튼은 그대로 동작
+  if(e.touches.length >= 2){
+    const [a, b] = e.touches;
+    g = { type:'pinch', d0: dist(a, b), s0: zs, mx: (a.clientX + b.clientX) / 2, my: (a.clientY + b.clientY) / 2, moved:true };
+  }else{
+    const t = e.touches[0];
+    g = { type:'one', x0: t.clientX, y0: t.clientY, tx0: zx, ty0: zy, dx: 0, dy: 0, moved:false, t0: Date.now() };
+  }
 }, { passive:true });
+
+lb.addEventListener('touchmove', e => {
+  if(!g) return;
+  e.preventDefault();                              // 화면 전체 확대·스크롤 막기
+  if(e.touches.length >= 2){
+    const [a, b] = e.touches;
+    if(g.type !== 'pinch') g = { type:'pinch', d0: dist(a, b), s0: zs, mx: (a.clientX + b.clientX) / 2, my: (a.clientY + b.clientY) / 2, moved:true };
+    const mx = (a.clientX + b.clientX) / 2, my = (a.clientY + b.clientY) / 2;
+    zZoomAt(g.s0 * dist(a, b) / g.d0, mx, my);
+    // 두 손가락을 함께 움직이면 사진도 따라 이동
+    zx += mx - g.mx; zy += my - g.my; g.mx = mx; g.my = my; zClamp(); zApply();
+    return;
+  }
+  if(g.type !== 'one') return;
+  const t = e.touches[0];
+  g.dx = t.clientX - g.x0; g.dy = t.clientY - g.y0;
+  if(Math.abs(g.dx) + Math.abs(g.dy) > 8) g.moved = true;
+  if(zs > 1){ zx = g.tx0 + g.dx; zy = g.ty0 + g.dy; zClamp(); zApply(); }   // 확대 중이면 이동만
+}, { passive:false });
+
+lb.addEventListener('touchend', e => {
+  if(!g) return;
+  if(e.touches.length) {                           // 한 손가락만 뗀 경우: 남은 손가락으로 이어서 이동
+    const t = e.touches[0];
+    g = { type:'one', x0: t.clientX, y0: t.clientY, tx0: zx, ty0: zy, dx:0, dy:0, moved:true, t0: Date.now() };
+    return;
+  }
+  const done = g; g = null;
+  if(done.type === 'pinch'){ if(zs < 1.05) zReset(true); swallowUntil = Date.now() + 400; return; }
+  if(done.moved){
+    swallowUntil = Date.now() + 400;
+    // 확대하지 않았을 때만 옆으로 밀어 넘기기
+    if(zs === 1 && Math.abs(done.dx) >= 50 && Math.abs(done.dx) > Math.abs(done.dy) * 1.2) lbMove(done.dx < 0 ? 1 : -1);
+    return;
+  }
+  // 두 번 톡톡 → 확대/원래대로
+  const now = Date.now(), t = e.changedTouches[0];
+  if(now - lastTap < 300 && Math.hypot(t.clientX - lastTapX, t.clientY - lastTapY) < 30){
+    lastTap = 0; swallowUntil = Date.now() + 400;
+    if(zs > 1) zReset(true); else zZoomAt(2.5, t.clientX, t.clientY, true);
+    return;
+  }
+  lastTap = now; lastTapX = t.clientX; lastTapY = t.clientY;
+}, { passive:true });
+lb.addEventListener('touchcancel', () => { g = null; }, { passive:true });
+// 아이폰 사파리의 화면 전체 확대 막기
+lb.addEventListener('gesturestart', e => e.preventDefault());
+// 컴퓨터: 두 번 클릭으로 확대, 휠로 확대·축소
+// (손가락으로 두 번 톡톡하면 휴대폰이 dblclick도 보내므로, 터치 직후의 dblclick은 무시)
+lbImg.addEventListener('dblclick', e => { if(Date.now() - lastTouch < 800) return; if(zs > 1) zReset(true); else zZoomAt(2.5, e.clientX, e.clientY, true); });
+lb.addEventListener('wheel', e => { e.preventDefault(); zZoomAt(zs * (e.deltaY < 0 ? 1.15 : 1 / 1.15), e.clientX, e.clientY); }, { passive:false });
+// 손동작 뒤에 따라오는 클릭이 창을 닫지 않게
+lb.addEventListener('click', e => { if(Date.now() < swallowUntil && !e.target.closest('button')) e.stopPropagation(); }, true);
+
 lb.onclick = closeLightbox;
 document.getElementById('lbClose').onclick = e => { e.stopPropagation(); closeLightbox(); };
 document.getElementById('lbImg').onclick = e => e.stopPropagation();
