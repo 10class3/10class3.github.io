@@ -1,6 +1,6 @@
 // ── 3반 알리미 서비스워커 (캐시 + 푸시 알림) ──
 // 앱을 수정하면 아래 숫자를 v11, v12... 로 올리세요
-const CACHE = 'demo-v140';
+const CACHE = 'demo-v141';
 const ASSETS = ['./', './index.html', './manifest.json'];
 
 /* ── 푸시 알림 ── */

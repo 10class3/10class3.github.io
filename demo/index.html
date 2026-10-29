@@ -21,7 +21,7 @@
     if(!sessionStorage.getItem('seen')){
       sessionStorage.setItem('seen','1');
       d.classList.add('booting');
-      d.style.background = '#1e2430';
+      d.style.background = '#141519';
     }
   }catch(e){}
 })();
@@ -32,7 +32,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="mask-icon" href="./badge.png" color="#1e2430">
+<link rel="mask-icon" href="./badge.png" color="#141519">
 <meta name="apple-mobile-web-app-title" content="학급 알리미">
 <link rel="apple-touch-icon" href="../icon-192.png">
 <link rel="icon" href="../favicon-light.png" media="(prefers-color-scheme: light)">
@@ -259,34 +259,32 @@ input[type=date]{color-scheme:light dark}
 .crow input{flex:1;padding:11px 12px;font-size:15px}
 .crow .del{background:none;border:0;color:var(--dim);font-size:19px;cursor:pointer;padding:4px 2px;flex-shrink:0}
 
-/* 앱 시작 화면 — 스플래시와 같은 색에서 형광펜이 그어짐 */
-
-
-/* 시작 화면 — 스플래시 로고 위치에서 형광펜이 이어서 뻗어나감 */
+/* 앱 시작 화면 — 형광펜 세 줄이 손으로 긋듯 그어진 뒤, 살짝 떠오르며 앱으로 넘어감 */
 html:not(.booting) #boot{display:none}
 html.booting header,
 html.booting main,
-html.booting .fab{visibility:hidden}
-#boot{position:fixed;top:0;right:0;bottom:0;left:0;z-index:200;background:#1e2430;
+html.booting .fab,
+html.booting .aifab{visibility:hidden}
+#boot{position:fixed;top:0;right:0;bottom:0;left:0;z-index:200;background:#141519;
   display:flex;align-items:center;justify-content:center;
-  transition:opacity .14s ease}
+  transition:opacity .26s cubic-bezier(.23,1,.32,1)}
 #boot.off{opacity:0;pointer-events:none}
-.bootbars{position:absolute;
-  left:calc(50% - 13.44vw);
-  top:calc(50% - 9.6vw);
-  display:flex;flex-direction:column;gap:2.64vw}
-.bootbars i{height:4.08vw;border-radius:99px;width:0;display:block;
-  animation:draw .26s cubic-bezier(.25,.9,.3,1) forwards}
-.bootbars i:nth-child(1){background:#ffe95c;--w:11.83vw;--x:42vw;  animation-delay:0s}
-.bootbars i:nth-child(2){background:#c9b8ff;--w:9.14vw; --x:32.5vw;animation-delay:.04s}
-.bootbars i:nth-child(3){background:#a3efc9;--w:6.99vw; --x:25vw;  animation-delay:.08s}
-@keyframes draw{
-  0%  {width:0}
-  38% {width:var(--w)}     /* 스플래시 로고와 겹치는 순간 */
-  100%{width:var(--x)}
+.bootmark{width:min(44vw,240px);height:auto;overflow:visible;
+  transition:transform .3s cubic-bezier(.23,1,.32,1), filter .3s ease, opacity .3s ease}
+#boot.off .bootmark{transform:translateY(-10px) scale(.97);filter:blur(3px);opacity:0}
+/* 왼쪽에서 오른쪽으로 펜이 지나가며 칠해짐 — 빠르게 출발해 끝에서 힘을 빼는 손놀림 */
+.bootmark .hl{clip-path:inset(0 100% 0 0);
+  animation:ink .34s cubic-bezier(.32,.72,.24,1) forwards}
+.bootmark .hl:nth-child(2){animation-delay:.09s}
+.bootmark .hl:nth-child(3){animation-delay:.18s}
+@keyframes ink{
+  0%  {clip-path:inset(0 100% 0 0);opacity:.6}
+  35% {opacity:1}
+  100%{clip-path:inset(0 0 0 0);opacity:1}
 }
 @media (prefers-reduced-motion:reduce){
-  .bootbars i{animation:none;width:var(--w)}
+  .bootmark .hl{animation:none;clip-path:none}
+  #boot.off .bootmark{transform:none;filter:none}
 }
 
 /* 첨부 파일 */
@@ -634,7 +632,11 @@ html.booting .fab{visibility:hidden}
 </head>
 <body>
 
-<div id="boot"><div class="bootbars"><i></i><i></i><i></i></div></div>
+<div id="boot"><svg class="bootmark" viewBox="0 0 100 51" aria-hidden="true">
+  <path class="hl" d="M4.5 0H100L95.5 13H0Z" fill="#FFE14D"/>
+  <path class="hl" d="M4.5 19H77L72.5 32H0Z" fill="#B79CFF"/>
+  <path class="hl" d="M4.5 38H55L50.5 51H0Z" fill="#56E3A9"/>
+</svg></div>
 
 <header>
   <div class="hrow">
@@ -961,7 +963,7 @@ html.booting .fab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v136</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v137</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -3973,8 +3975,8 @@ function bootDone(){
   setTimeout(() => {
     root.classList.remove('booting');
     root.style.background = theme === 'dark' ? '#101216' : '#ffffff';
-    if(b){ b.classList.add('off'); setTimeout(() => b.remove(), 160); }
-  }, 400);
+    if(b){ b.classList.add('off'); setTimeout(() => b.remove(), 320); }
+  }, 560);
 }
 addEventListener('DOMContentLoaded', bootDone);   // 데이터를 기다리지 않고 바로 진행
 setTimeout(bootDone, 1200);
