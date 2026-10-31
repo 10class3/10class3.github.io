@@ -189,7 +189,10 @@ html.hw-on header{position:relative}
 .hw-space .sky{position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(90% 60% at 80% 0%,rgba(255,150,60,.18),transparent 60%),radial-gradient(70% 50% at 10% 100%,rgba(130,70,190,.28),transparent 70%),#0f0b14}
 .hw-space .sky::after{content:'';position:absolute;inset:0;background-image:radial-gradient(1.2px 1.2px at 12% 18%,#fff9 50%,transparent),radial-gradient(1px 1px at 28% 8%,#fff7 50%,transparent),radial-gradient(1.4px 1.4px at 52% 14%,#fff8 50%,transparent),radial-gradient(1px 1px at 64% 30%,#fff6 50%,transparent),radial-gradient(1.2px 1.2px at 86% 22%,#fff7 50%,transparent),radial-gradient(1px 1px at 40% 36%,#fff5 50%,transparent);animation:hw-twinkle 4s ease-in-out infinite alternate}
-.hw-scroll{position:relative;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top) + 8px) 20px calc(env(safe-area-inset-bottom) + 40px)}
+/* 이벤트 공간에서는 화면을 끌어내려도 새로고침되지 않게 */
+html.hw-lock,html.hw-lock body{overscroll-behavior:none}
+.hw-space,.hw-dark{overscroll-behavior:none}
+.hw-scroll{overscroll-behavior:contain;position:relative;flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:calc(env(safe-area-inset-top) + 8px) 20px calc(env(safe-area-inset-bottom) + 40px)}
 .hw-scroll > div{max-width:560px;margin:0 auto}
 .hw-top{display:flex;align-items:center;gap:10px;height:48px}
 .hw-iconbtn{width:40px;height:40px;border-radius:12px;border:0;background:rgba(255,255,255,.06);color:#f6eee4;display:grid;place-items:center;cursor:pointer;transition:transform .14s cubic-bezier(.23,1,.32,1),background .2s}
@@ -535,6 +538,7 @@ function openSpace(fromEl){
     if(e.target.closest('.hw-m,.hw-nums button,[data-back],.hw-ing,.hw-candy')) sfx('tap');
   });
   document.body.style.overflow = 'hidden';
+  document.documentElement.classList.add('hw-lock');
   if(!reduce){
     const iris = document.createElement('div'); iris.className = 'hw-iris flash';
     iris.style.setProperty('--x', x); iris.style.setProperty('--y', y);
@@ -550,7 +554,7 @@ function closeSpace(instant){
   stopMission();
   const el = spaceEl; spaceEl = null;
   if(!instant) sfx('leave');
-  const end = () => { el.remove(); if(!document.querySelector('.sheet.on')) document.body.style.overflow = ''; };
+  const end = () => { el.remove(); document.documentElement.classList.remove('hw-lock'); if(!document.querySelector('.sheet.on')) document.body.style.overflow = ''; };
   if(instant || reduce){ end(); return; }
   el.classList.remove('entering'); el.classList.add('leaving');
   setTimeout(end, 440);
