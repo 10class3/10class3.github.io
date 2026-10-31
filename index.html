@@ -957,13 +957,15 @@ html.booting .aifab{visibility:hidden}
   </div>
   <div class="mrow2" id="mailRow" hidden><span>받은 쪽지</span>
     <button class="hbtn ghost" id="mailBtn">열기</button></div>
+  <div class="mrow2" id="eventRow" hidden><span>할로윈 이벤트<br><small class="hint" style="margin:4px 0 0;display:block" id="eventHint">켜면 모두에게 테마와 미션이 열려요</small></span>
+    <button class="hbtn ghost" id="eventBtn">켜기</button></div>
   <div class="mrow2" id="statsRow" hidden><span>사용 통계<br><small class="hint" style="margin:4px 0 0;display:block">방문 기기·AI 질문·알림 기기 수</small></span>
     <button class="hbtn ghost" id="statsBtn">열기</button></div>
   <div class="mrow2" id="gearRow" hidden><span>분류 관리</span>
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v137</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v138</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -2483,6 +2485,7 @@ onAuthStateChanged(auth, user => {
   if(tk) setDoc(doc(db, C('tokens'),tk), { admin: !!isAdmin }, { merge:true }).catch(()=>{});
   document.getElementById('gearRow').hidden = !isMain;
   document.getElementById('statsRow').hidden = !isMain;
+  paintEventRow();
   document.body.classList.toggle('hasfab', isAdmin);
   document.getElementById('backupRow').hidden = !isMain;
 
@@ -4334,6 +4337,55 @@ addEventListener('contextmenu', e => {
   if(t.closest && t.closest('.dtl-body, .msg .mt')) return;
   e.preventDefault();
 });
+
+/* ═══ 시즌 이벤트 — 이벤트는 따로 떨어진 파일(halloween.js)에 있고, 켜져 있을 때만 불러옴 ═══ */
+const EVENT_JS = './halloween.js';
+const BASE_PALETTE = PALETTE.slice();
+let eventCfg = null, eventMod = null, eventLoading = false;
+// 이벤트 파일에 넘기는 앱 기능 (이벤트 파일은 이것만 씀)
+const appApi = {
+  db, C, SPACE, auth, PUSH_URL, devId,
+  fs: { doc, collection, onSnapshot, setDoc, getDocs, query, orderBy },
+  toast, ask, note, esc, pushLayer,
+  back: () => history.back(),
+  isAdmin: () => isAdmin, isMain: () => isMain,
+  timetable: () => timetable, meals: () => meals, items: () => items,
+  timetableHTML: () => timetableHTML(),
+  setPalette: arr => { PALETTE.splice(0, PALETTE.length, ...(arr || BASE_PALETTE)); render(); renderTabs(); },
+  cfg: () => eventCfg
+};
+function paintEventRow(){
+  const row = document.getElementById('eventRow');
+  if(!row) return;
+  row.hidden = !isMain;
+  const on = !!(eventCfg && eventCfg.on);
+  document.getElementById('eventBtn').textContent = on ? '끄기' : '켜기';
+  document.getElementById('eventHint').textContent = on ? '지금 진행 중이에요 · 끄면 테마와 미션이 사라져요' : '켜면 모두에게 테마와 미션이 열려요';
+}
+document.getElementById('eventBtn').onclick = async () => {
+  const on = !!(eventCfg && eventCfg.on);
+  if(!await ask(on ? '할로윈 이벤트를 끌까요?' : '할로윈 이벤트를 켤까요?',
+    on ? '모든 친구 화면에서 테마와 미션이 사라져요. 기록은 남아 있어서 다시 켜면 이어져요.' : '모든 친구 화면에 할로윈 테마와 미션이 열려요.', on ? '끄기' : '켜기', on)) return;
+  try{
+    await setDoc(doc(db, C('config'), 'event'), {
+      on: !on, prizes: (eventCfg && eventCfg.prizes) || 15,
+      skip: (eventCfg && Array.isArray(eventCfg.skip)) ? eventCfg.skip : [7], max: (eventCfg && eventCfg.max) || 35
+    }, { merge:true });
+  }catch{ toast('바꾸지 못했어요. 잠시 뒤 다시 시도해 주세요'); }
+};
+onSnapshot(doc(db, C('config'), 'event'), snap => {
+  eventCfg = snap.exists() ? snap.data() : null;
+  paintEventRow();
+  const on = !!(eventCfg && eventCfg.on);
+  if(on){
+    if(eventMod) eventMod.update(eventCfg);
+    else if(!eventLoading){
+      eventLoading = true;
+      import(EVENT_JS).then(m => { eventMod = m; eventLoading = false; if(eventCfg && eventCfg.on) m.start(appApi, eventCfg); })
+        .catch(() => { eventLoading = false; });
+    }
+  }else if(eventMod) eventMod.stop();
+}, () => {});
 
 renderTabs(); drawCatPick(); sessions = [{label:'',date:''}]; drawSessions();
 </script>
