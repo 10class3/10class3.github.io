@@ -638,11 +638,27 @@ async function paintAdmin(){
   box.innerHTML = `<div class="hw-admin"><h4>관리자</h4>
     <div class="ln"><span>선착순 간식 인원</span><input id="hwPz" type="number" min="0" max="60" value="${prizes()}"><button class="sm" id="hwPzS">저장</button></div>
     <div class="ln"><span>마지막 번호 / 없는 번호</span><input id="hwMax" type="number" min="1" max="60" value="${Number(cfg.max) || 35}" style="width:60px"><input id="hwSkip" value="${(cfg.skip || []).join(',')}" style="width:80px" placeholder="예: 7,21"><button class="sm" id="hwNumS">저장</button></div>
+    <div class="ln"><span>번호 옮기기<br><small style="font-weight:700;color:#a596b4">잘못 고른 번호를 바로잡아요</small></span><input id="hwMvA" type="number" min="1" max="60" placeholder="원래" style="width:60px"><input id="hwMvB" type="number" min="1" max="60" placeholder="바꿀" style="width:60px"><button class="sm" id="hwMvS">옮기기</button></div>
     <div id="hwList" class="hw-p">명단 불러오는 중…</div></div>`;
   const save = async data => { try{ await A.fs.setDoc(A.fs.doc(A.db, A.C('config'), 'event'), data, { merge:true }); A.toast('저장했어요'); }catch{ A.toast('저장하지 못했어요'); } };
   $('#hwPzS').onclick = () => save({ prizes: Math.max(0, Math.min(60, Number($('#hwPz').value) || 0)) });
   $('#hwNumS').onclick = () => save({ max: Math.max(1, Math.min(60, Number($('#hwMax').value) || 35)),
     skip: String($('#hwSkip').value).split(/[^0-9]+/).map(Number).filter(n => n > 0 && n <= 60) });
+  $('#hwMvS').onclick = async () => {
+    const from = Number($('#hwMvA').value), to = Number($('#hwMvB').value);
+    if(!from || !to || from === to) return A.toast('원래 번호와 바꿀 번호를 넣어 주세요');
+    if(!await A.ask(`${from}번 기록을 ${to}번으로 옮길까요?`, '클리어 기록과 순위는 그대로 옮겨지고, 그 친구 기기는 앱을 다시 열면 자동으로 새 번호로 바뀌어요. 원래 번호는 비어서 다른 친구가 참여할 수 있어요.', '옮기기')) return;
+    const b = $('#hwMvS'); b.disabled = true;
+    try{
+      const idToken = await A.auth.currentUser.getIdToken();
+      const r = await fetch(A.PUSH_URL + 'event', { method:'POST', headers:{ 'Content-Type':'application/json' },
+        body: JSON.stringify({ space: A.SPACE, move:true, from, to, idToken }) });
+      const res = await r.json();
+      if(res.ok){ A.toast(`${from}번 → ${to}번으로 옮겼어요`); paintAdmin(); }
+      else A.note('옮기지 못했어요', res.error || '다시 시도해 주세요.');
+    }catch{ A.note('옮기지 못했어요', '인터넷 연결을 확인해 주세요.'); }
+    b.disabled = false;
+  };
   try{
     const snap = await A.fs.getDocs(A.fs.collection(A.db, A.C('event_players')));
     const rows = [];
@@ -656,18 +672,25 @@ async function paintAdmin(){
 }
 
 /* ───────── 서버 기록 ───────── */
-async function send(body){
+async function send(body, again = true){
   try{
     const r = await fetch(A.PUSH_URL + 'event', { method:'POST', headers:{ 'Content-Type':'application/json' },
       body: JSON.stringify({ space: A.SPACE, ...body }) });
-    return await r.json();
+    const res = await r.json();
+    // 관리자가 번호를 옮겼으면 이 기기도 새 번호로 바꾸고 한 번 더 보냄
+    if(res && res.moved && again && body.key){
+      const m = me();
+      if(m && m.key === body.key){ LS.set('me', { ...m, num: res.moved }); paintCard(); const chip = spaceEl && spaceEl.querySelector('.hw-top .hw-chip'); if(chip) chip.textContent = res.moved + '번'; }
+      return send({ ...body, num: res.moved }, false);
+    }
+    return res;
   }catch{ return null; }
 }
 function keepPieces(res){ if(res && res.pieces) LS.set('pieces', { ...(LS.get('pieces') || {}), ...res.pieces }); }
-async function refreshPieces(){          // 예전에 깬 미션인데 도장이 비어 있으면 다시 받아 옴
-  const m = me(), pc = LS.get('pieces') || {};
-  if(!m || ![...done()].some(s => !pc[s])) return;
-  keepPieces(await send({ num: m.num, key: m.key, stage:'' }));
+async function refreshPieces(){          // 앱을 열 때 한 번: 도장 조각·순번·옮겨진 번호를 서버와 맞춤
+  const m = me(); if(!m) return;
+  const res = await send({ num: m.num, key: m.key, stage:'' });
+  if(res && res.ok){ keepPieces(res); if(res.rank) LS.set('rank', res.rank); paintCard(); }
 }
 async function recordClear(stage){
   const m = me(); if(!m) return null;
