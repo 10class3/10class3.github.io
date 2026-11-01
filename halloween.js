@@ -26,7 +26,8 @@ const STAGES2 = [
 ];
 let STAGES = STAGES1;
 const st = id => STAGES.find(x => x.id === id);
-const rk = k => ROUND > 1 ? `r${ROUND}:${k}` : k;          // 라운드마다 기기 기록을 따로
+let PREVIEW = false;              // 총괄 관리자의 '2일차 미리보기' (이 기기에서만 · 서버 기록 없음)
+const rk = k => ROUND > 1 ? `${PREVIEW ? 'p' : 'r'}${ROUND}:${k}` : k;          // 라운드마다 기기 기록을 따로 (미리보기는 또 따로)
 const KN = () => ['', '한', '두', '세', '네', '다섯'][STAGES.length];
 const TITLE = () => ROUND > 1 ? '망자의 날' : '할로윈 밤';
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -537,6 +538,8 @@ html.hw-r2 .hw-iris{background:radial-gradient(circle at var(--x) var(--y),#ffe0
 .fx.sq{border-radius:2px}
 .fx.puff{background:rgba(255,248,235,.75)!important;filter:blur(1.5px)}
 .fx.smoke{background:rgba(60,48,58,.7)!important;filter:blur(3px)}
+/* 미리보기 띠 */
+.mw-pv{position:absolute;left:50%;top:52px;transform:translateX(-50%);z-index:5;padding:5px 12px;border-radius:999px;background:#9be15d;color:#14240a;font-size:11.5px;font-weight:900;white-space:nowrap;pointer-events:none}
 /* 미션 시작 카드 */
 .mi-why{margin:-6px 0 10px;font-size:13px;font-weight:800;color:#ff9ac4}
 /* 제단에 놓인 것들 */
@@ -811,7 +814,7 @@ export function start(api, config){
   A = api; cfg = config || {};
   if(started){ update(cfg); return; }
   started = true; firstStats = true;
-  ROUND = Number(cfg.round) === 2 ? 2 : 1;
+  ROUND = PREVIEW ? 2 : Number(cfg.round) === 2 ? 2 : 1;
   STAGES = ROUND > 1 ? STAGES2 : STAGES1; CARDS = ROUND > 1 ? CARDS2 : CARDS1;
   stats = { dist: Array(STAGES.length + 1).fill(0), ranked:0, last:null, total:0 };
   if(A.SPACE) STAGES1[0].name = '정전된 교실';        // 체험판은 반 이름 대신
@@ -831,13 +834,13 @@ export function start(api, config){
     firstStats = false;
     paintCard(); paintSpace();
   }, () => {});
-  retryPending().then(refreshPieces);
+  if(!PREVIEW) retryPending().then(refreshPieces);
   addEventListener('hashchange', onHash);
   setTimeout(onHash, 900);           // 링크(#halloween)로 들어온 경우
 }
 export function update(config){
   if(!started){ if(A && config && config.on) start(A, config); return; }   // 껐다가 다시 켠 경우
-  if((Number(config && config.round) === 2 ? 2 : 1) !== ROUND){           // 관리자가 1일차 ↔ 2일차를 바꿈
+  if((PREVIEW ? 2 : Number(config && config.round) === 2 ? 2 : 1) !== ROUND){           // 관리자가 1일차 ↔ 2일차를 바꿈
     const wasOpen = !!spaceEl;
     stop(); start(A, config);
     if(wasOpen) setTimeout(() => openSpace(), 120);
@@ -985,7 +988,7 @@ function showPick(){
     if(!await A.ask(`${sel}번이 맞나요?`, '한 번 정하면 이 기기에서는 바꿀 수 없어요.', '맞아요')) return;
     const key = (crypto.randomUUID ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2))).replace(/-/g, '');
     const j = $('#hwJoin', root); j.disabled = true; j.textContent = '들어가는 중…';
-    const res = await send({ num: sel, key, stage:'' });
+    const res = PREVIEW ? { ok:true } : await send({ num: sel, key, stage:'' });
     if(res && res.ok){ LS.set('me', { num: sel, key }); keepPieces(res); sfx('ignite'); showHome(); }
     else{ j.disabled = false; j.textContent = `${sel}번으로 들어가기`; A.note('들어가지 못했어요', (res && res.error) || '인터넷 연결을 확인해 주세요.'); }
   };
@@ -1045,7 +1048,9 @@ function paintSpace(){
 async function paintAdmin(){
   const box = $('#hwAdmin'); if(!box) return;
   box.innerHTML = `<div class="hw-admin"><h4>관리자</h4>
-    <div class="ln"><span>진행 중: <b style="color:#ffb070">${ROUND}일차 · ${TITLE()}</b></span><button class="sm" id="hwRd">${ROUND > 1 ? '1일차로 되돌리기' : '2일차 열기'}</button></div>
+    ${PREVIEW ? `<div class="ln"><span>지금은 <b style="color:#9be15d">2일차 미리보기</b>예요<br><small style="font-weight:700;color:#a596b4">이 기기에서만 보이고 기록이 남지 않아요</small></span><button class="sm" id="hwPvR">진행 초기화</button><button class="sm" id="hwPvX">끝내기</button></div>`
+    : `<div class="ln"><span>진행 중: <b style="color:#ffb070">${ROUND}일차 · ${TITLE()}</b></span><button class="sm" id="hwRd">${ROUND > 1 ? '1일차로 되돌리기' : '2일차 열기'}</button></div>
+    ${ROUND === 1 ? '<div class="ln"><span>2일차 미리보기<br><small style="font-weight:700;color:#a596b4">나만 보임 · 기록 안 남음</small></span><button class="sm" id="hwPv">미리보기</button></div>' : ''}`}
     <div class="ln"><span>선착순 간식 인원 (${ROUND}일차)</span><input id="hwPz" type="number" min="0" max="60" value="${prizes()}"><button class="sm" id="hwPzS">저장</button></div>
     <div class="ln"><span>마지막 번호 / 없는 번호</span><input id="hwMax" type="number" min="1" max="60" value="${Number(cfg.max) || 35}" style="width:60px"><input id="hwSkip" value="${(cfg.skip || []).join(',')}" style="width:80px" placeholder="예: 7,21"><button class="sm" id="hwNumS">저장</button></div>
     <div class="ln"><span>번호 옮기기<br><small style="font-weight:700;color:#a596b4">잘못 고른 번호를 바로잡아요</small></span><input id="hwMvA" type="number" min="1" max="60" placeholder="원래" style="width:60px"><input id="hwMvB" type="number" min="1" max="60" placeholder="바꿀" style="width:60px"><button class="sm" id="hwMvS">옮기기</button></div>
@@ -1054,7 +1059,12 @@ async function paintAdmin(){
     <div id="hwList" class="hw-p">명단 불러오는 중…</div></div>`;
   const save = async data => { try{ await A.fs.setDoc(A.fs.doc(A.db, A.C('config'), 'event'), data, { merge:true }); A.toast('저장했어요'); }catch{ A.toast('저장하지 못했어요'); } };
   $('#hwPzS').onclick = () => save({ [ROUND > 1 ? 'prizes' + ROUND : 'prizes']: Math.max(0, Math.min(60, Number($('#hwPz').value) || 0)) });
-  $('#hwRd').onclick = async () => {
+  const restart = on => { PREVIEW = on; stop(); start(A, cfg); setTimeout(() => { openSpace(); }, 150); };
+  const pv = $('#hwPv'); if(pv) pv.onclick = () => { A.toast('2일차 미리보기를 열어요 · 친구들 화면은 그대로예요', 2400); restart(true); };
+  const px = $('#hwPvX'); if(px) px.onclick = () => restart(false);
+  const pr = $('#hwPvR'); if(pr) pr.onclick = () => { ['done', 'stars', 'pieces', 'rank', 'hidden', 'intro'].forEach(k => { try{ localStorage.removeItem('hw:' + (A.SPACE || '') + rk(k)); }catch{} }); A.toast('미리보기 진행을 처음으로 돌렸어요'); restart(true); };
+  if(!$('#hwRd')){ /* 미리보기 중에는 라운드 전환 버튼 없음 */ }
+  else $('#hwRd').onclick = async () => {
     const to = ROUND > 1 ? 1 : 2;
     const ok = to === 2
       ? await A.ask('2일차(망자의 날)를 열까요?', '모두의 화면이 바로 2일차로 바뀌어요. 1일차 기록은 지금 상태 그대로 보관되고 더 이상 바뀌지 않아요. 열기 전에 1일차 명단을 "파일로 저장"해 두는 걸 추천해요.', '2일차 열기')
@@ -1147,6 +1157,7 @@ async function refreshPieces(){          // 앱을 열 때 한 번: 도장 조�
 async function recordClear(stage){
   const m = me(); if(!m) return null;
   const d = done(); d.add(stage); LS.set(rk('done'), [...d]);
+  if(PREVIEW){ keepPieces({ pieces:{ [stage]:'TEST' } }); paintCard(); return { ok:true, preview:true }; }   // 미리보기는 서버에 안 보냄
   const res = await send({ num: m.num, key: m.key, stage });
   if(res && res.ok){
     if(res.rank) LS.set(rk('rank'), res.rank);
@@ -1311,7 +1322,7 @@ function showHidden(){
   const all = done().size === STAGES.length, h = LS.get(rk('hidden')), R2 = ROUND > 1;
   const place = R2 ? '제단의 비밀을 찾았' : '달의 뒷면을 봤';
   const okHTML = n => `<div class="hw-mine" style="text-align:center">히든 미션 성공 · <b>${n}번째</b>로 ${place}어요</div>
-    <p class="hw-rules">이 비밀은 너만 알고 있어 줘. 반장·부반장에게 <b>"${place}다"</b>고 말하면 상품을 받아요. 명단에 이미 기록돼 있어요.</p>`;
+    <p class="hw-rules">이 비밀은 너만 알고 있어 줘. 명단에 자동으로 기록됐으니 따로 말하지 않아도 상품을 받아요.</p>`;
   const body = h ? okHTML(h)
     : !all ? (R2 ? `<div class="qq">제단이 조용해요.<br>촛불 네 개가 모두 켜진 뒤에 다시 와 보세요.</div>`
                  : `<div class="qq">달이 아무 말도 하지 않아요.<br>등불 다섯 개가 모두 타오르는 밤에 다시 와 보세요.</div>`)
@@ -1327,6 +1338,7 @@ function showHidden(){
   const submit = async () => {
     const v = inp.value.trim(); if(!v) return;
     go.disabled = true; go.textContent = '달이 듣는 중…';
+    if(PREVIEW){ A.note('미리보기', '미리보기에서는 정답을 서버에서 확인하지 않아요. 입구가 열리는 것까지만 시험해 보세요.'); return; }
     const res = await send({ num: m.num, key: m.key, answer: v });
     go.disabled = false; go.textContent = R2 ? '제단에 말하기' : '달에게 말하기';
     if(res && res.ok && res.hidden){
@@ -1801,6 +1813,7 @@ function showWorld(){
           <div id="hwMine"></div>
         </section>
       </div></div>
+      ${PREVIEW ? '<div class="mw-pv">미리보기 · 나만 보여요 · 기록 안 남음</div>' : ''}
       <div class="mw-hud"><button class="mw-hb" id="mwBook">기록장 <b>${d.size}/${STAGES.length}</b></button>${A.isMain() ? '<button class="mw-hb" id="mwAdm">관리자</button>' : ''}</div>
       <div class="mw-pts">${[...Array(6)].map((_, i) => `<i style="left:${8 + i * 16}%;--d:${11 + i % 3 * 4}s;--dl:${-i * 2.3}s"></i>`).join('')}</div>
       <nav class="mw-map" id="mwDots">${[...STAGES.map(s => s.id), 'altar'].map((id, i) => `<button data-k="${i}" class="${id === 'altar' ? (d.size === STAGES.length ? 'lit' : '') : d.has(id) && id !== just ? 'lit' : ''}" aria-label="${id === 'altar' ? '우리 반 제단' : st(id).name}">${id === 'altar' ? SVG.mari : MI_ICON[id]}</button>`).join('<b></b>')}</nav>
