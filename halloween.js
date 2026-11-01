@@ -27,7 +27,7 @@ const STAGES2 = [
 let STAGES = STAGES1;
 const st = id => STAGES.find(x => x.id === id);
 let PREVIEW = false;              // 총괄 관리자의 '2일차 미리보기' (이 기기에서만 · 서버 기록 없음)
-const rk = k => ROUND > 1 ? `${PREVIEW ? 'p' : 'r'}${ROUND}:${k}` : k;          // 라운드마다 기기 기록을 따로 (미리보기는 또 따로)
+const rk = k => ROUND > 1 ? `${PREVIEW ? 'q' : 'r'}${ROUND}:${k}` : k;          // 미리보기는 q (예전 버전 미리보기 기록 p는 무시)          // 라운드마다 기기 기록을 따로 (미리보기는 또 따로)
 const KN = () => ['', '한', '두', '세', '네', '다섯'][STAGES.length];
 const TITLE = () => ROUND > 1 ? '망자의 날' : '할로윈 밤';
 const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
