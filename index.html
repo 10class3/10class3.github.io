@@ -155,6 +155,34 @@ body.hasfab .toast{bottom:calc(env(safe-area-inset-bottom) + 160px)}
 .row{display:grid;grid-template-columns:58px 1fr;gap:15px;padding:19px 0;
   border-bottom:1px solid var(--rule);cursor:pointer;align-items:start}
 .row:active{opacity:.55}
+/* 꾹 눌러 고르기 (관리자) */
+.row{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;position:relative}
+.selmode .row{transition:background .15s}
+.selmode .row .dcell{visibility:hidden}
+.selmode .row::before{content:'';position:absolute;left:16px;top:21px;width:22px;height:22px;border-radius:50%;
+  border:2px solid var(--dimmer);background:var(--paper);box-sizing:border-box;z-index:1}
+.selmode .row.sel::before{border-color:var(--ink);background:var(--ink)}
+.selmode .row.sel::after{content:'';position:absolute;left:23px;top:26px;width:6px;height:10px;border:solid var(--paper);
+  border-width:0 2.4px 2.4px 0;transform:rotate(45deg);z-index:2}
+.selmode .row.sel{background:var(--soft)}
+.selmode .row.nosel{opacity:.32}
+.selmode .row.nosel::before{display:none}
+.selmode .row:active{opacity:1}
+.selmode #tabs{pointer-events:none;opacity:.35}
+.selmode .fab,.selmode .aifab{pointer-events:none;opacity:0;transition:opacity .2s}
+.selbar{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 16px);z-index:70;transform:translate(-50%,140%);
+  width:min(calc(100% - 24px),520px);box-sizing:border-box;display:flex;align-items:center;gap:6px;padding:8px;border-radius:18px;
+  background:var(--ink);color:var(--paper);box-shadow:0 10px 30px rgba(0,0,0,.3);transition:transform .32s cubic-bezier(.23,1,.32,1)}
+.selbar.on{transform:translate(-50%,0)}
+.selbar b{flex:1;font-size:14px;font-weight:800;padding:0 6px;white-space:nowrap}
+.selbar button{height:40px;padding:0 12px;border-radius:12px;border:0;background:transparent;color:inherit;font-family:inherit;
+  font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap}
+.selbar button:active{background:rgba(127,127,127,.25)}
+.selbar button:disabled{opacity:.3;cursor:default}
+.selbar .sx{width:40px;padding:0;font-size:18px}
+.selbar .mv{width:40px;padding:0;font-size:17px}
+.selbar .dl{background:var(--urgent);color:#fff}
+.selbar .dl:active{background:var(--urgent);opacity:.8}
 .grouphead:active, .tcard:active, .tbar:active{opacity:.6}
 .tab:active{opacity:.6}
 .dcell{text-align:right;padding-top:1px}
@@ -965,7 +993,7 @@ html.booting .aifab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v139</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v140</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1000,6 +1028,14 @@ html.booting .aifab{visibility:hidden}
   </div>
 </div>
 
+<div class="selbar" id="selBar" role="toolbar" aria-label="선택한 안내">
+  <button class="sx" id="selX" aria-label="선택 끝내기">✕</button>
+  <b id="selN">0개 선택</b>
+  <button id="selAll">전체</button>
+  <button class="mv" id="selUp" aria-label="고정 순서 위로" hidden>↑</button>
+  <button class="mv" id="selDown" aria-label="고정 순서 아래로" hidden>↓</button>
+  <button class="dl" id="selDel">삭제</button>
+</div>
 <div class="toast" id="toast"></div>
 
 <script type="module">
@@ -1262,7 +1298,7 @@ function render(){
 
   const isLive = e => e.item.pin || !e.date || dday(e.date) >= 0;
   const live = pool.filter(isLive).sort((a,b) =>
-    (b.item.pin?1:0) - (a.item.pin?1:0) || (a.date||'9999').localeCompare(b.date||'9999'));
+    (b.item.pin?1:0) - (a.item.pin?1:0) || (a.item.pin && b.item.pin ? pinKey(a.item) - pinKey(b.item) : 0) || (a.date||'9999').localeCompare(b.date||'9999'));
   const past = pool.filter(e => !isLive(e))
                    .sort((a,b) => b.date.localeCompare(a.date));
 
@@ -1306,6 +1342,7 @@ function render(){
   }
 
   const openPast = showPast || !!q;
+  shownRows = [...live, ...(past.length && openPast ? past : [])];
   box.innerHTML = live.map(e => rowHTML(e,false)).join('') +
     (past.length
       ? `<button class="pastToggle" id="pastToggle">${openPast ? '지난 안내 접기 ▲' : `지난 안내 ${past.length}개 보기 ▼`}</button>` +
@@ -1313,7 +1350,14 @@ function render(){
       : '');
   const pt = document.getElementById('pastToggle');
   if(pt) pt.onclick = () => { pushView(); showPast = !showPast; render(); };
-  box.querySelectorAll('.row').forEach(r => r.onclick = () => openDetail(r.dataset.id));
+  box.querySelectorAll('.row').forEach(r => {
+    r.onclick = () => {
+      if(Date.now() - longAt < 450) return;                       // 꾹 누른 직후의 눌림은 무시
+      if(selMode) toggleSel(r.dataset.id); else openDetail(r.dataset.id);
+    };
+    bindLong(r);
+  });
+  if(selMode) paintSel();
 }
 
 // 맨 위 '다가오는 할 일' — 7일 안의 일정 중 끝내지 않은 것 (2일 안은 빨간색)
@@ -1458,7 +1502,8 @@ function rowHTML(e, isPast){
   }
   const thumbs = (i.images||[]).slice(0,3).map(s=>`<img src="${s}" alt="">`).join('');
   const fin = !i.readonly && isDone(i.id, e.sess);
-  return `<article class="row ${isPast?'past':''} ${i.holiday?'isHoli':''} ${fin?'done':''}" data-id="${esc(i.id)}">
+  const sc = selMode ? (canEdit(i) ? (selIds.has(i.id) ? 'sel' : '') : 'nosel') : '';
+  return `<article class="row ${isPast?'past':''} ${i.holiday?'isHoli':''} ${fin?'done':''} ${sc}" data-id="${esc(i.id)}">
     <div class="dcell"><span class="dnum ${d.cls} ${
       String(d.num).length >= 6 ? 'xlong' : String(d.num).length >= 5 ? 'long' : ''
     }">${d.num}</span>${d.label?`<span class="dlabel">${d.label}</span>`:''}</div>
@@ -1687,20 +1732,120 @@ function bindChecks(i){
   });
 }
 
+async function deleteNotice(pid){              // 안내 하나와 딸린 사진·투표·파일까지 지움
+  await deleteDoc(doc(db, C('notices'),pid));
+  getDocs(query(PHOTOS, where('n','==',pid)))
+    .then(s => s.forEach(d => deleteDoc(d.ref).catch(()=>{}))).catch(()=>{});
+  getDocs(query(VOTES, where('n','==',pid)))
+    .then(s => s.forEach(d => deleteDoc(d.ref).catch(()=>{}))).catch(()=>{});
+  getDocs(query(FILES, where('n','==',pid)))
+    .then(s => s.forEach(d => deleteDoc(d.ref).catch(()=>{}))).catch(()=>{});
+}
+
+/* ═══ 꾹 눌러 여러 개 고르기 (관리자) — 한 번에 삭제 · 고정 안내 순서 바꾸기 ═══ */
+let selMode = false, longAt = 0, shownRows = [], selBusy = false;
+const selIds = new Set();
+const pinKey = i => typeof i.pinOrder === 'number' ? i.pinOrder
+  : (i.date ? Date.parse(i.date + 'T00:00:00') || 9e15 : 9e15);    // 순서를 정한 적 없으면 날짜순
+function bindLong(r){
+  let t = 0, x0 = 0, y0 = 0;
+  const stop = () => { clearTimeout(t); t = 0; };
+  r.addEventListener('pointerdown', e => {
+    if(e.button > 0) return;
+    x0 = e.clientX; y0 = e.clientY; stop();
+    if(!isAdmin) return;                        // 꾹 눌러 고르기는 관리자만
+    t = setTimeout(() => {
+      t = 0; if(!isAdmin) return;
+      longAt = Date.now();
+      const it = items.find(x => x.id === r.dataset.id);
+      if(!it || !canEdit(it)){ toast('직접 쓴 안내만 고를 수 있어요'); return; }
+      if(selMode){ toggleSel(it.id); return; }
+      enterSel(it.id);
+    }, 480);
+  });
+  r.addEventListener('pointermove', e => { if(t && Math.hypot(e.clientX - x0, e.clientY - y0) > 10) stop(); });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(n => r.addEventListener(n, stop));
+  r.addEventListener('contextmenu', e => e.preventDefault());
+}
+function enterSel(id){
+  selMode = true; selIds.clear(); if(id) selIds.add(id);
+  document.body.classList.add('selmode');
+  pushLayer(() => exitSel(true));
+  render();
+  if(!localStorage.getItem('selTip')){ localStorage.setItem('selTip', '1'); toast('여러 개를 골라 한 번에 지우거나, 고정 안내 하나를 골라 순서를 바꿀 수 있어요', 4200); }
+}
+function exitSel(fromBack){
+  if(!selMode) return;
+  selMode = false; selIds.clear();
+  document.body.classList.remove('selmode');
+  document.getElementById('selBar').classList.remove('on');
+  render();
+  if(!fromBack) setTimeout(() => history.back(), 30);   // 쌓아 둔 뒤로가기 한 칸을 정리 (확인창이 닫힌 직후에도 확실히)
+}
+function toggleSel(id){
+  const it = items.find(x => x.id === id);
+  if(!it || !canEdit(it)) return;
+  selIds.has(id) ? selIds.delete(id) : selIds.add(id);
+  render();
+}
+const selectableShown = () => [...new Set(shownRows.filter(e => canEdit(e.item)).map(e => e.item.id))];
+const pinnedShown = () => [...new Set(shownRows.filter(e => e.item.pin).map(e => e.item.id))];
+function paintSel(){
+  [...selIds].forEach(id => { if(!items.some(x => x.id === id)) selIds.delete(id); });   // 그사이 지워진 안내는 빼기
+  const bar = document.getElementById('selBar'), n = selIds.size, can = selectableShown();
+  bar.classList.add('on');
+  document.getElementById('selN').textContent = `${n}개 선택`;
+  document.getElementById('selAll').textContent = can.length && can.every(id => selIds.has(id)) ? '해제' : '전체';
+  document.getElementById('selDel').disabled = !n || selBusy;
+  const one = n === 1 ? items.find(x => x.id === [...selIds][0]) : null, pins = pinnedShown();
+  const k = one && one.pin ? pins.indexOf(one.id) : -1, mv = k >= 0 && pins.length > 1;
+  document.getElementById('selUp').hidden = document.getElementById('selDown').hidden = !mv;
+  document.getElementById('selUp').disabled = !mv || k === 0 || selBusy;
+  document.getElementById('selDown').disabled = !mv || k === pins.length - 1 || selBusy;
+}
+document.getElementById('selX').onclick = () => exitSel();
+document.getElementById('selAll').onclick = () => {
+  const can = selectableShown();
+  if(can.length && can.every(id => selIds.has(id))) selIds.clear(); else can.forEach(id => selIds.add(id));
+  render();
+};
+document.getElementById('selDel').onclick = async () => {
+  const ids = [...selIds]; if(!ids.length || selBusy) return;
+  if(!await ask(`안내 ${ids.length}개를 삭제할까요?`, '삭제한 안내는 복구할 수 없어요.', '삭제', true)) return;
+  selBusy = true; paintSel();
+  const res = await Promise.allSettled(ids.map(deleteNotice));
+  const fail = res.filter(r => r.status === 'rejected').length;
+  selBusy = false;
+  exitSel();
+  toast(fail ? `${ids.length - fail}개 삭제 · ${fail}개는 삭제하지 못했어요` : `${ids.length}개를 삭제했어요`);
+};
+async function moveSel(dir){
+  const id = [...selIds][0], pins = pinnedShown(), k = pins.indexOf(id), t = k + dir;
+  if(selBusy || k < 0 || t < 0 || t >= pins.length) return;
+  const order = pins.slice(); [order[k], order[t]] = [order[t], order[k]];
+  const its = order.map(x => items.find(i => i.id === x));
+  const blocked = its.some((it, n) => it.pinOrder !== (n + 1) * 1000 && !canEdit(it));
+  if(blocked) return toast('다른 관리자가 쓴 고정 안내와는 순서를 바꿀 수 없어요');
+  const changes = its.map((it, n) => [it, (n + 1) * 1000]).filter(([it, v]) => it.pinOrder !== v);
+  const before = changes.map(([it]) => [it, it.pinOrder]);
+  changes.forEach(([it, v]) => it.pinOrder = v);            // 화면 먼저 바꾸고 저장
+  selBusy = true; render();
+  try{ await Promise.all(changes.map(([it, v]) => updateDoc(doc(db, C('notices'), it.id), { pinOrder: v }))); }
+  catch{ before.forEach(([it, v]) => it.pinOrder = v); toast('순서를 저장하지 못했어요'); }
+  selBusy = false; render();
+  const r = document.querySelector(`#list .row[data-id="${CSS.escape(id)}"]`);
+  if(r) r.scrollIntoView({ block:'nearest', behavior:'smooth' });   // 옮긴 안내가 화면 밖으로 나가지 않게
+}
+document.getElementById('selUp').onclick = () => moveSel(-1);
+document.getElementById('selDown').onclick = () => moveSel(1);
+
 let deleting = false;
 document.getElementById('delBtn').onclick = async () => {
   if(!current || deleting) return;
   if(!await ask('이 안내를 삭제할까요?', '삭제한 안내는 복구할 수 없어요.', '삭제', true)) return;
   deleting = true;
   try{
-    const pid = current.id;
-    await deleteDoc(doc(db, C('notices'),pid));
-    getDocs(query(PHOTOS, where('n','==',pid)))
-      .then(s => s.forEach(d => deleteDoc(d.ref).catch(()=>{}))).catch(()=>{});
-    getDocs(query(VOTES, where('n','==',pid)))
-      .then(s => s.forEach(d => deleteDoc(d.ref).catch(()=>{}))).catch(()=>{});
-    getDocs(query(FILES, where('n','==',pid)))
-      .then(s => s.forEach(d => deleteDoc(d.ref).catch(()=>{}))).catch(()=>{});
+    await deleteNotice(current.id);
     closeSheet('detail'); toast('삭제했어요');
   }
   catch{ toast('삭제에 실패했어요'); }
@@ -2132,7 +2277,7 @@ onSnapshot(CFG, snap => {
 const NQ = query(COL, orderBy('createdAt','desc'), limit(400));
 const mapNotice = d => {
   const v = d.data();
-  return { id:d.id, cat:v.cat||'', title:v.title||'', date:v.date||'', pin: !!v.pin,
+  return { id:d.id, cat:v.cat||'', title:v.title||'', date:v.date||'', pin: !!v.pin, pinOrder: typeof v.pinOrder === 'number' ? v.pinOrder : null,
            author:v.author||'', authorName:v.authorName||'', holiday: !!v.holiday,
            poll: (v.poll && Array.isArray(v.poll.options) && v.poll.options.length >= 2) ? v.poll : null,
            range: (v.range && (v.range.from || v.range.to)) ? v.range : null,
@@ -2475,6 +2620,7 @@ onAuthStateChanged(auth, user => {
     return;
   }
   isAdmin = !!user;
+  if(!isAdmin && selMode) exitSel();
   myUid = user ? user.uid : null;
   isMain = myUid === MAIN_UID;
   document.getElementById('fab').classList.toggle('on', isAdmin);
