@@ -134,7 +134,6 @@ body.hasfab main{padding-bottom:180px}          /* 아래 떠 있는 버튼에 �
 .row.done{opacity:.45}
 .donechip{display:inline-block;font-size:10.5px;font-weight:800;padding:1px 6px;border-radius:5px;margin-right:6px;
   vertical-align:2px;background:var(--ink);color:var(--paper)}
-body.hasfab .toast{bottom:calc(env(safe-area-inset-bottom) + 160px)}
 .stiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
 .stile{padding:14px;border-radius:13px;background:var(--soft)}
 .stile b{display:block;font-size:24px;font-weight:900;letter-spacing:-.03em}
@@ -562,10 +561,26 @@ html.booting .aifab{visibility:hidden}
 .aifab:active{opacity:.75}
 .aifab svg{width:18px;height:18px}
 .fab.on ~ .aifab{bottom:calc(env(safe-area-inset-bottom) + 90px)}
-.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(env(safe-area-inset-bottom) + 92px);
-  background:var(--ink);color:var(--paper);padding:12px 19px;border-radius:999px;font-size:13.5px;font-weight:700;
-  z-index:130;opacity:0;transition:opacity .2s;pointer-events:none;letter-spacing:-.02em;max-width:88vw;text-align:center}
-.toast.on{opacity:1}
+.toast{position:fixed;left:16px;right:16px;bottom:calc(env(safe-area-inset-bottom) + 18px);z-index:130;
+  max-width:480px;margin:0 auto;box-sizing:border-box;display:flex;align-items:center;gap:11px;min-height:50px;padding:12px 16px 12px 14px;
+  border-radius:14px;background:var(--panel);color:var(--ink);border:1px solid var(--rule);
+  box-shadow:0 1px 2px rgba(0,0,0,.06),0 8px 24px rgba(0,0,0,.1);
+  font-size:14px;font-weight:700;line-height:1.45;letter-spacing:-.02em;text-align:left;word-break:keep-all;
+  opacity:0;transform:translateY(10px);transition:opacity .2s,transform .32s cubic-bezier(.23,1,.32,1);pointer-events:none}
+.toast.on{opacity:1;transform:none}
+.toast .ti{flex:none;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--ink);color:var(--paper)}
+.toast .ti svg{width:13px;height:13px}
+.toast.ok .ti{background:#16a34a;color:#fff}
+.toast.err .ti{background:var(--urgent);color:#fff}
+.toast .tt{flex:1;min-width:0}
+/* 오른쪽 아래 + 버튼과 겹치지 않게 옆으로 비켜 섬 */
+body:not(.hasfab) .aifab.on ~ .toast{bottom:calc(env(safe-area-inset-bottom) + 78px)}   /* 학생 화면: AI 버튼 바로 위 */
+body.hasfab .toast{right:88px;bottom:calc(env(safe-area-inset-bottom) + 25px)}
+@media (min-width:600px){body.hasfab .toast{right:16px;bottom:calc(env(safe-area-inset-bottom) + 92px)}}
+body.hasfab .toast.tall{right:16px;bottom:calc(env(safe-area-inset-bottom) + 148px)}   /* 긴 문장은 버튼 두 개 위로 */
+.selmode .toast{right:16px;bottom:calc(env(safe-area-inset-bottom) + 86px)}
+html[data-theme="dark"] .toast{box-shadow:0 10px 30px rgba(0,0,0,.45)}
+@media (prefers-color-scheme:dark){html:not([data-theme="light"]) .toast{box-shadow:0 10px 30px rgba(0,0,0,.45)}}
 
 .lightbox{position:fixed;top:0;right:0;bottom:0;left:0;z-index:120;background:#000;display:none;
   align-items:center;justify-content:center;padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
@@ -993,7 +1008,7 @@ html.booting .aifab{visibility:hidden}
     <button class="hbtn ghost" id="gearBtn">열기</button></div>
   <div class="mrow2" id="backupRow" hidden><span>공지 백업<br><small class="hint" style="margin:4px 0 0;display:block">모든 공지를 파일로 저장해요</small></span>
     <button class="hbtn ghost" id="backupBtn">내보내기</button></div>
-  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v140</p>
+  <p class="hint" id="verLine" hidden style="text-align:center;margin-top:20px">v141</p>
 </section>
 
 <!-- 설치 안내 -->
@@ -1036,7 +1051,7 @@ html.booting .aifab{visibility:hidden}
   <button class="mv" id="selDown" aria-label="고정 순서 아래로" hidden>↓</button>
   <button class="dl" id="selDel">삭제</button>
 </div>
-<div class="toast" id="toast"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
 
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js';
@@ -2227,9 +2242,23 @@ window.closeSheet = id => {
 };
 
 let toastTimer;
+const TOAST_IC = {
+  ok:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>',
+  err: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 6.5v7"/><circle cx="12" cy="18" r=".6" fill="currentColor"/></svg>',
+  info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M12 11v6.5"/><circle cx="12" cy="6.5" r=".6" fill="currentColor"/></svg>'
+};
+// 문장으로 종류를 짐작 (실패 = 빨강, 완료 = 초록, 그 밖의 안내 = 기본색)
+const toastKind = m => /실패|지 못|못했|못 마|못 읽|오류|확인해 주세요|확인하세요|다시 시도|수 없어요/.test(m) ? 'err'
+  : /중…|중이에요|주세요/.test(m) ? 'info'
+  : /(었|았|했|됐|렸|웠|껐|켰)어요|전송|고마워요/.test(m) ? 'ok' : 'info';
 function toast(msg, ms = 2400){
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('on');
+  const t = document.getElementById('toast'), k = toastKind(String(msg));
+  t.className = 'toast ' + k;
+  t.innerHTML = `<span class="ti" aria-hidden="true">${TOAST_IC[k]}</span><span class="tt"></span>`;
+  t.querySelector('.tt').textContent = msg;
+  // + 버튼 옆 좁은 자리에서 두 줄을 넘기면 AI 버튼과 겹치니 버튼들 위로 올림
+  if(document.body.classList.contains('hasfab') && innerWidth < 600 && !document.body.classList.contains('selmode') && t.offsetHeight > 70) t.classList.add('tall');
+  void t.offsetWidth; t.classList.add('on');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(()=>t.classList.remove('on'), ms);
 }
